@@ -1,0 +1,768 @@
+"""Visualization module for generating HTML charts from commit data."""
+
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Dict, Any, Literal
+from collections import defaultdict
+
+from pyecharts import options as opts
+from pyecharts.charts import Line, Calendar, Page
+from pyecharts.commons.utils import JsCode
+from jinja2 import Template
+
+
+Granularity = Literal["day", "week", "month"]
+
+
+def load_json_files(json_dir: str) -> List[Dict[str, Any]]:
+    """Load all JSON files from a directory.
+
+    Args:
+        json_dir: Directory containing JSON files.
+
+    Returns:
+        List of repository data dictionaries.
+    """
+    data = []
+    for filepath in Path(json_dir).glob("*.json"):
+        with open(filepath, "r", encoding="utf-8") as f:
+            data.append(json.load(f))
+    return data
+
+
+def aggregate_by_period(
+    commits: List[Dict[str, Any]],
+    granularity: Granularity
+) -> Dict[str, int]:
+    """Aggregate commit changes by time period.
+
+    Args:
+        commits: List of commit dictionaries.
+        granularity: Aggregation period (day/week/month).
+
+    Returns:
+        Dictionary mapping period string to total changes.
+    """
+    aggregated = defaultdict(int)
+
+    for commit in commits:
+        ts = datetime.fromisoformat(commit["timestamp"])
+        changes = commit["additions"] + commit["deletions"]
+
+        if granularity == "day":
+            key = ts.strftime("%Y-%m-%d")
+        elif granularity == "week":
+            # Get the Monday of the week
+            monday = ts - timedelta(days=ts.weekday())
+            key = monday.strftime("%Y-%m-%d")
+        else:  # month
+            key = ts.strftime("%Y-%m")
+
+        aggregated[key] += changes
+
+    return aggregated
+
+
+def get_date_range(all_data: List[Dict[str, Any]]) -> tuple[str, str]:
+    """Get the overall date range from all repositories.
+
+    Args:
+        all_data: List of repository data.
+
+    Returns:
+        Tuple of (start_date, end_date) in YYYY-MM-DD format.
+    """
+    all_dates = []
+    for repo in all_data:
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            all_dates.append(ts.date())
+
+    if not all_dates:
+        # Default to current year if no data
+        today = datetime.now().date()
+        return f"{today.year}-01-01", f"{today.year}-12-31"
+
+    min_date = min(all_dates)
+    max_date = max(all_dates)
+
+    return min_date.strftime("%Y-%m-%d"), max_date.strftime("%Y-%m-%d")
+
+
+def get_years_from_data(all_data: List[Dict[str, Any]]) -> List[str]:
+    """Extract all unique years from the data.
+
+    Args:
+        all_data: List of repository data.
+
+    Returns:
+        List of year strings in descending order.
+    """
+    years = set()
+    for repo in all_data:
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            years.add(str(ts.year))
+    return sorted(years, reverse=True)
+
+
+def create_line_chart(
+    all_data: List[Dict[str, Any]],
+    granularity: Granularity
+) -> Line:
+    """Create a line chart showing changes over time per repository.
+
+    Args:
+        all_data: List of repository data.
+        granularity: Time aggregation granularity.
+
+    Returns:
+        Line chart object.
+    """
+    # Get all unique time periods across all repos
+    all_periods = set()
+    repo_series = {}
+
+    for repo in all_data:
+        aggregated = aggregate_by_period(repo["commits"], granularity)
+        repo_series[repo["repo_name"]] = aggregated
+        all_periods.update(aggregated.keys())
+
+    # Sort periods
+    sorted_periods = sorted(all_periods)
+
+    # Create x-axis labels
+    x_data = sorted_periods
+
+    line = Line(init_opts=opts.InitOpts(width="100%", height="500px"))
+    line.add_xaxis(x_data)
+
+    # Add series for each repo
+    colors = [
+        "#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de",
+        "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc", "#48b8d0"
+    ]
+
+    for idx, (repo_name, data) in enumerate(repo_series.items()):
+        y_data = [data.get(period, 0) for period in sorted_periods]
+        line.add_yaxis(
+            series_name=repo_name,
+            y_axis=y_data,
+            color=colors[idx % len(colors)],
+            is_smooth=True,
+            label_opts=opts.LabelOpts(is_show=False),
+        )
+
+    line.set_global_opts(
+        title_opts=opts.TitleOpts(title="Commit Changes Over Time"),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        legend_opts=opts.LegendOpts(
+            type_="scroll",
+            orient="vertical",
+            pos_left="left",
+            pos_top="middle",
+            selected_mode="multiple"
+        ),
+        xaxis_opts=opts.AxisOpts(
+            type_="category",
+            axislabel_opts=opts.LabelOpts(rotate=45)
+        ),
+        yaxis_opts=opts.AxisOpts(
+            name="Lines Changed",
+            type_="value"
+        ),
+        datazoom_opts=[
+            opts.DataZoomOpts(type_="inside"),
+            opts.DataZoomOpts(type_="slider")
+        ]
+    )
+
+    return line
+
+
+def create_line_chart_for_range(
+    all_data: List[Dict[str, Any]],
+    granularity: Granularity,
+    date_range: tuple[str, str]
+) -> str:
+    """Create line chart options JSON for a specific date range."""
+    start_date = datetime.strptime(date_range[0], "%Y-%m-%d").date()
+    end_date = datetime.strptime(date_range[1], "%Y-%m-%d").date()
+
+    # Get all unique time periods across all repos within range
+    all_periods = set()
+    repo_series = {}
+
+    for repo in all_data:
+        aggregated = aggregate_by_period(repo["commits"], granularity)
+        # Filter by date range
+        filtered = {}
+        for period, value in aggregated.items():
+            if granularity == "day":
+                period_date = datetime.strptime(period, "%Y-%m-%d").date()
+            elif granularity == "week":
+                period_date = datetime.strptime(period, "%Y-%m-%d").date()
+            else:  # month
+                period_date = datetime.strptime(period, "%Y-%m").date()
+
+            if start_date <= period_date <= end_date:
+                filtered[period] = value
+
+        repo_series[repo["repo_name"]] = filtered
+        all_periods.update(filtered.keys())
+
+    if not all_periods:
+        # Return empty chart options
+        return '{"xAxis":{"data":[]},"series":[]}'
+
+    sorted_periods = sorted(all_periods)
+
+    line = Line(init_opts=opts.InitOpts(width="100%", height="500px"))
+    line.add_xaxis(sorted_periods)
+
+    colors = [
+        "#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de",
+        "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc", "#48b8d0"
+    ]
+
+    for idx, (repo_name, data) in enumerate(repo_series.items()):
+        y_data = [data.get(period, 0) for period in sorted_periods]
+        line.add_yaxis(
+            series_name=repo_name,
+            y_axis=y_data,
+            color=colors[idx % len(colors)],
+            is_smooth=True,
+            label_opts=opts.LabelOpts(is_show=False),
+        )
+
+    line.set_global_opts(
+        title_opts=opts.TitleOpts(title="Commit Changes Over Time"),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        legend_opts=opts.LegendOpts(
+            type_="scroll",
+            orient="vertical",
+            pos_left="left",
+            pos_top="middle",
+            selected_mode="multiple"
+        ),
+        xaxis_opts=opts.AxisOpts(
+            type_="category",
+            axislabel_opts=opts.LabelOpts(rotate=45)
+        ),
+        yaxis_opts=opts.AxisOpts(
+            name="Lines Changed",
+            type_="value"
+        ),
+        datazoom_opts=[
+            opts.DataZoomOpts(type_="inside"),
+            opts.DataZoomOpts(type_="slider")
+        ]
+    )
+
+    return line.dump_options()
+
+
+def create_aggregate_heatmap(
+    all_data: List[Dict[str, Any]],
+    date_range: tuple[str, str]
+) -> Calendar:
+    """Create an aggregated calendar heatmap for all repositories.
+
+    Args:
+        all_data: List of repository data.
+        date_range: Tuple of (start_date, end_date).
+
+    Returns:
+        Calendar heatmap object.
+    """
+    # Aggregate all commits by day
+    daily_data = defaultdict(int)
+    for repo in all_data:
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            date_str = ts.strftime("%Y-%m-%d")
+            daily_data[date_str] += commit["additions"] + commit["deletions"]
+
+    # Convert to format expected by Calendar
+    calendar_data = [[date, value] for date, value in sorted(daily_data.items())]
+
+    calendar = Calendar(init_opts=opts.InitOpts(width="100%", height="300px"))
+    calendar.add(
+        series_name="",
+        yaxis_data=calendar_data,
+        calendar_opts=opts.CalendarOpts(
+            pos_left="100px",
+            pos_right="50px",
+            pos_top="50px",
+            pos_bottom="20px",
+            range_=date_range,
+            yearlabel_opts=opts.CalendarYearLabelOpts(is_show=True),
+            monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
+            daylabel_opts=opts.CalendarDayLabelOpts(is_show=True),
+        )
+    )
+
+    calendar.set_global_opts(
+        title_opts=opts.TitleOpts(title="Aggregated Commit Activity"),
+        visualmap_opts=opts.VisualMapOpts(
+            max_=max(daily_data.values()) if daily_data else 100,
+            min_=0,
+            orient="horizontal",
+            is_piecewise=False,
+            pos_left="100px",
+            pos_bottom="0px",
+        ),
+        tooltip_opts=opts.TooltipOpts(formatter=JsCode(
+            "function(p){return p.data[0] + ': ' + p.data[1] + ' lines'}"
+        ))
+    )
+
+    return calendar
+
+
+def create_individual_heatmaps(
+    all_data: List[Dict[str, Any]],
+    date_range: tuple[str, str]
+) -> tuple[Page, List[Dict[str, str]]]:
+    """Create individual calendar heatmaps for each repository.
+
+    Args:
+        all_data: List of repository data.
+        date_range: Tuple of (start_date, end_date).
+
+    Returns:
+        Tuple of (Page containing multiple calendar heatmaps, list of repo info dicts).
+    """
+    page = Page(layout=Page.SimplePageLayout)
+    repo_info_list = []
+
+    for repo in all_data:
+        daily_data = defaultdict(int)
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            date_str = ts.strftime("%Y-%m-%d")
+            daily_data[date_str] += commit["additions"] + commit["deletions"]
+
+        calendar_data = [[date, value] for date, value in sorted(daily_data.items())]
+
+        calendar = Calendar(init_opts=opts.InitOpts(width="100%", height="200px"))
+        calendar.add(
+            series_name="",
+            yaxis_data=calendar_data,
+            calendar_opts=opts.CalendarOpts(
+                pos_left="100px",
+                pos_right="50px",
+                pos_top="30px",
+                pos_bottom="10px",
+                range_=date_range,
+                yearlabel_opts=opts.CalendarYearLabelOpts(is_show=False),
+                monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
+                daylabel_opts=opts.CalendarDayLabelOpts(is_show=False),
+            )
+        )
+
+        max_val = max(daily_data.values()) if daily_data else 100
+        calendar.set_global_opts(
+            title_opts=opts.TitleOpts(title=repo["repo_name"], pos_left="10px"),
+            visualmap_opts=opts.VisualMapOpts(
+                max_=max_val,
+                min_=0,
+                orient="horizontal",
+                is_piecewise=False,
+                pos_left="100px",
+                pos_bottom="0px",
+            ),
+            tooltip_opts=opts.TooltipOpts(formatter=JsCode(
+                "function(p){return p.data[0] + ': ' + p.data[1] + ' lines'}"
+            ))
+        )
+
+        page.add(calendar)
+        repo_info_list.append({
+            "name": repo["repo_name"],
+            "path": repo.get("repo_path", "")
+        })
+
+    return page, repo_info_list
+
+
+def create_aggregate_heatmap_for_range(
+    all_data: List[Dict[str, Any]],
+    date_range: tuple[str, str]
+) -> str:
+    """Create aggregate heatmap options JSON for a specific date range."""
+    daily_data = defaultdict(int)
+    for repo in all_data:
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            date_str = ts.strftime("%Y-%m-%d")
+            daily_data[date_str] += commit["additions"] + commit["deletions"]
+
+    calendar_data = [[date, value] for date, value in sorted(daily_data.items())]
+
+    calendar = Calendar(init_opts=opts.InitOpts(width="100%", height="300px"))
+    calendar.add(
+        series_name="",
+        yaxis_data=calendar_data,
+        calendar_opts=opts.CalendarOpts(
+            pos_left="100px",
+            pos_right="50px",
+            pos_top="50px",
+            pos_bottom="20px",
+            range_=date_range,
+            yearlabel_opts=opts.CalendarYearLabelOpts(is_show=True),
+            monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
+            daylabel_opts=opts.CalendarDayLabelOpts(is_show=True),
+        )
+    )
+
+    calendar.set_global_opts(
+        visualmap_opts=opts.VisualMapOpts(
+            max_=max(daily_data.values()) if daily_data else 100,
+            min_=0,
+            orient="horizontal",
+            is_piecewise=False,
+            pos_left="100px",
+            pos_bottom="0px",
+        ),
+        tooltip_opts=opts.TooltipOpts(formatter=JsCode(
+            "function(p){return p.data[0] + ': ' + p.data[1] + ' lines'}"
+        ))
+    )
+
+    return calendar.dump_options()
+
+
+def create_individual_heatmap_for_range(
+    all_data: List[Dict[str, Any]],
+    date_range: tuple[str, str]
+) -> List[str]:
+    """Create individual heatmap options JSON list for a specific date range."""
+    options_list = []
+
+    for repo in all_data:
+        daily_data = defaultdict(int)
+        for commit in repo["commits"]:
+            ts = datetime.fromisoformat(commit["timestamp"])
+            date_str = ts.strftime("%Y-%m-%d")
+            daily_data[date_str] += commit["additions"] + commit["deletions"]
+
+        calendar_data = [[date, value] for date, value in sorted(daily_data.items())]
+
+        calendar = Calendar(init_opts=opts.InitOpts(width="100%", height="200px"))
+        calendar.add(
+            series_name="",
+            yaxis_data=calendar_data,
+            calendar_opts=opts.CalendarOpts(
+                pos_left="100px",
+                pos_right="50px",
+                pos_top="30px",
+                pos_bottom="10px",
+                range_=date_range,
+                yearlabel_opts=opts.CalendarYearLabelOpts(is_show=False),
+                monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
+                daylabel_opts=opts.CalendarDayLabelOpts(is_show=False),
+            )
+        )
+
+        max_val = max(daily_data.values()) if daily_data else 100
+        calendar.set_global_opts(
+            visualmap_opts=opts.VisualMapOpts(
+                max_=max_val,
+                min_=0,
+                orient="horizontal",
+                is_piecewise=False,
+                pos_left="100px",
+                pos_bottom="0px",
+            ),
+            tooltip_opts=opts.TooltipOpts(formatter=JsCode(
+                "function(p){return p.data[0] + ': ' + p.data[1] + ' lines'}"
+            ))
+        )
+
+        options_list.append(calendar.dump_options())
+
+    return options_list
+
+def rewrite_path(path: str) -> str:
+    """Rewrite file path to use forward slashes for better compatibility."""
+    return path.replace("\\", "/")
+
+def generate_html(
+    json_dir: str,
+    output_path: str,
+    granularity: Granularity = "week"
+) -> str:
+    """Generate a complete HTML file with all visualizations.
+
+    Args:
+        json_dir: Directory containing JSON files.
+        output_path: Path to save the HTML file.
+        granularity: Time aggregation granularity.
+
+    Returns:
+        Path to the generated HTML file.
+    """
+    all_data = load_json_files(json_dir)
+
+    if not all_data:
+        raise ValueError(f"No JSON files found in {json_dir}")
+
+    date_range = get_date_range(all_data)
+    years = get_years_from_data(all_data)
+
+    # Create line chart
+    line_chart = create_line_chart(all_data, granularity)
+
+    # Generate heatmap options for all years and each individual year
+    # Store as dict with year -> {aggregate: json_str, individual: [json_str, ...]}
+    heatmap_data = {"all": {
+        "aggregate": create_aggregate_heatmap_for_range(all_data, date_range),
+        "individual": create_individual_heatmap_for_range(all_data, date_range)
+    }}
+
+    for year in years:
+        year_range = (f"{year}-01-01", f"{year}-12-31")
+        heatmap_data[year] = {
+            "aggregate": create_aggregate_heatmap_for_range(all_data, year_range),
+            "individual": create_individual_heatmap_for_range(all_data, year_range)
+        }
+
+    # Build JavaScript object string manually to avoid double JSON encoding
+    def build_heatmap_js_obj():
+        parts = []
+        for year_key, data in heatmap_data.items():
+            agg = data["aggregate"]
+            ind_parts = ",".join(data["individual"])
+            parts.append(f'"{year_key}":{{"aggregate":{agg},"individual":[{ind_parts}]}}')
+        return "{" + ",".join(parts) + "}"
+
+    heatmap_js_obj = build_heatmap_js_obj()
+
+    # Get repo info for individual heatmaps
+    repo_info = [{"name": repo["repo_name"], "path": repo.get("repo_path", "")} for repo in all_data]
+
+    # Build HTML with card layout
+    html_template = Template("""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Git Stats Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: #333;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .year-selector {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .chart-container {
+            width: 100%;
+        }
+        .heatmaps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
+            gap: 20px;
+        }
+        .heatmap-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .heatmap-card .chart-container {
+            height: 180px;
+        }
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .repo-name {
+            font-weight: 600;
+            color: #333;
+        }
+        .open-folder-btn {
+            background: #4a90d9;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .open-folder-btn:hover {
+            background: #357abd;
+        }
+        .repo-path {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Git Stats Visualization</h1>
+
+    <div class="card">
+        <div class="chart-container" id="line-chart" style="height:500px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🗓️ Aggregated Commit Activity</span>
+            <select class="year-selector" id="aggregate-year-selector" onchange="updateAggregateHeatmap(this.value)">
+                <option value="all">All Years</option>
+                {% for year in years %}
+                <option value="{{ year }}">{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="chart-container" id="aggregate-heatmap" style="height:300px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">📁 Individual Repository Heatmaps</span>
+            <select class="year-selector" id="individual-year-selector" onchange="updateIndividualHeatmaps(this.value)">
+                <option value="all">All Years</option>
+                {% for year in years %}
+                <option value="{{ year }}">{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="heatmaps-grid">
+            {% for item in individual_charts %}
+            <div class="heatmap-card">
+                <div class="repo-header">
+                    <span class="repo-name">{{ item.name }}</span>
+                    <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
+                        📂 Open Folder
+                    </button>
+                </div>
+                <div class="repo-path">{{ item.path }}</div>
+                <div class="chart-container" id="{{ item.id }}" style="height:160px;"></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        // Heatmap data for all years
+        var heatmapData = {{ heatmap_js_obj }};
+
+        // Open folder function
+        function openFolder(path) {
+            var vscodeUrl = 'vscode://file/' + path.replace(/\\\\/g, '/');
+            var link = document.createElement('a');
+            link.href = vscodeUrl;
+            link.click();
+        }
+
+        // Line chart
+        var lineChart = echarts.init(document.getElementById('line-chart'));
+        lineChart.setOption({{ line_chart_options }});
+        window.addEventListener('resize', function() { lineChart.resize(); });
+
+        // Aggregate heatmap
+        var aggregateChart = echarts.init(document.getElementById('aggregate-heatmap'));
+        aggregateChart.setOption(heatmapData['all'].aggregate);
+        window.addEventListener('resize', function() { aggregateChart.resize(); });
+
+        function updateAggregateHeatmap(year) {
+            aggregateChart.setOption(heatmapData[year].aggregate, true);
+            document.getElementById('individual-year-selector').value = year;
+            updateIndividualHeatmaps(year);
+        }
+
+        // Individual heatmaps
+        var individualCharts = [];
+        {% for item in individual_charts %}
+        (function() {
+            var chart = echarts.init(document.getElementById('{{ item.id }}'));
+            individualCharts.push(chart);
+            window.addEventListener('resize', function() { chart.resize(); });
+        })();
+        {% endfor %}
+
+        // Initialize individual heatmaps with 'all' data
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].setOption(heatmapData['all'].individual[i]);
+        }
+
+        function updateIndividualHeatmaps(year) {
+            document.getElementById('aggregate-year-selector').value = year;
+            for (var i = 0; i < individualCharts.length; i++) {
+                individualCharts[i].setOption(heatmapData[year].individual[i], true);
+            }
+        }
+    </script>
+</body>
+</html>
+    """)
+
+    # Generate chart options
+    line_chart_options = line_chart.dump_options()
+
+    # Generate chart IDs for individual heatmaps
+    individual_charts_data = []
+    for idx, repo in enumerate(repo_info):
+        chart_id = f"individual-heatmap-{idx}"
+        individual_charts_data.append({
+            "id": chart_id,
+            "name": repo["name"],
+            "path": rewrite_path(repo["path"])
+        })
+
+    # Render HTML
+    html_content = html_template.render(
+        line_chart_options=line_chart_options,
+        years=years,
+        heatmap_js_obj=heatmap_js_obj,
+        individual_charts=individual_charts_data
+    )
+
+    # Write to file
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(html_content, encoding="utf-8")
+
+    return str(output_file)
