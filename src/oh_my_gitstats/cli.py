@@ -1,12 +1,11 @@
 """Command-line interface for oh-my-gitstats."""
 
 from pathlib import Path
-from typing import Literal
 
 import click
 
 from .collector import collect_all_repos
-from .visualizer import generate_html, Granularity
+from .visualizer import generate_html
 
 
 @click.group()
@@ -56,22 +55,16 @@ def collect(path: str, output: str, quiet: bool):
     type=click.Path(file_okay=True, dir_okay=False),
     help="Path to save the HTML file (default: ./output/stats.html)",
 )
-@click.option(
-    "-g", "--granularity",
-    type=click.Choice(["day", "week", "month"]),
-    default="week",
-    help="Time aggregation granularity (default: week)",
-)
-def visualize(json_dir: str, output: str, granularity: Granularity):
+def visualize(json_dir: str, output: str):
     """Generate HTML visualization from JSON files in JSON_DIR.
 
     Creates an interactive HTML file with:
-    - Line chart (click legend to toggle projects)
+    - Line chart (metric and granularity selectable via UI)
     - Aggregated calendar heatmap
     - Individual calendar heatmaps per project
     """
     try:
-        output_path = generate_html(json_dir, output, granularity)
+        output_path = generate_html(json_dir, output)
         print(f"Generated: {output_path}")
     except ValueError as e:
         raise click.ClickException(str(e))
