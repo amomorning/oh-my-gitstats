@@ -12,7 +12,6 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 
 ![Line Chart](imgs/linechart.png)
 ![Heatmap](imgs/heatmap.png)
-![alt text](imgs/repo.png)
 
 ## ✨ Features
 
@@ -100,6 +99,9 @@ The generated HTML contains:
 2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
 
 3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and an "Open Folder" button to open in VS Code.
+
+![alt text](imgs/repo.png)
+
 
 ## 📋 JSON Format
 

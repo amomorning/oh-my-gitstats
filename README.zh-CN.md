@@ -12,7 +12,6 @@
 
 ![折线图](imgs/linechart.png)
 ![热力图](imgs/heatmap.png)
-![alt text](imgs/repo.png)
 
 ## ✨ 功能
 
@@ -100,6 +99,9 @@ gitstats visualize ./data --output ./output/stats.html
 2. **🗓️ 聚合热力图** - 所有仓库的汇总活跃度，支持年份选择（全部年份 / 指定年份）。
 
 3. **📊 独立热力图** - 每个仓库的日历视图，网格布局排列，显示同步状态指示器和"打开文件夹"按钮（在 VS Code 中打开）。
+
+![alt text](imgs/repo.png)
+
 
 ## 📋 JSON 格式
 
