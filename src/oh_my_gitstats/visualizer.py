@@ -33,7 +33,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
 
     # Pre-compute all chart data
     line_js_obj = build_line_js_obj(all_data)
-    heatmap_js_obj = build_heatmap_js_obj(all_data, date_range, years)
+    heatmap_js_obj, active_repos_js_obj = build_heatmap_js_obj(all_data, date_range, years)
 
     # Get repo info for individual heatmaps
     repo_info = [
@@ -67,6 +67,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
     html_content = html_template.render(
         line_js_obj=line_js_obj,
         heatmap_js_obj=heatmap_js_obj,
+        active_repos_js_obj=active_repos_js_obj,
         years=years,
         individual_charts=individual_charts_data,
         sync_legend=[

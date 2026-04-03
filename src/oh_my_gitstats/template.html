@@ -167,7 +167,7 @@
         </div>
         <div class="heatmaps-grid">
             {% for item in individual_charts %}
-            <div class="heatmap-card">
+            <div class="heatmap-card" data-repo-index="{{ loop.index0 }}">
                 <div class="repo-header">
                     <span class="repo-name">{{ item.name }}</span>
                     <div style="display:flex;align-items:center;gap:8px;">
@@ -190,6 +190,7 @@
         // Pre-computed chart data
         var lineData = {{ line_js_obj }};
         var heatmapData = {{ heatmap_js_obj }};
+        var activeRepos = {{ active_repos_js_obj }};
 
         // Current state
         var currentMetric = 'commits';
@@ -228,6 +229,16 @@
         for (var i = 0; i < individualCharts.length; i++) {
             individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
         }
+        filterRepos(currentMetric, currentYear);
+
+        function filterRepos(metric, year) {
+            var active = activeRepos[metric][year];
+            var cards = document.querySelectorAll('.heatmap-card');
+            cards.forEach(function(card) {
+                var idx = parseInt(card.getAttribute('data-repo-index'));
+                card.style.display = active.indexOf(idx) !== -1 ? '' : 'none';
+            });
+        }
 
         // Control handlers
         function onMetricChange(metric) {
@@ -239,6 +250,7 @@
             for (var i = 0; i < individualCharts.length; i++) {
                 individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
             }
+            filterRepos(currentMetric, year);
         }
 
         function onGranularityChange(granularity) {
@@ -252,6 +264,7 @@
             for (var i = 0; i < individualCharts.length; i++) {
                 individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
             }
+            filterRepos(currentMetric, year);
         }
 
         function updateIndividualHeatmaps(year) {
@@ -259,6 +272,7 @@
             for (var i = 0; i < individualCharts.length; i++) {
                 individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
             }
+            filterRepos(currentMetric, year);
         }
     </script>
 </body>

@@ -4,14 +4,14 @@
 
 # 📊 oh-my-gitstats
 
-[中文](README.zh-CN.md) | English
+[中文](https://github.com/amomorning/oh-my-gitstats/blob/main/README.zh-CN.md) | English
 
 A Python CLI tool for collecting git commit statistics and visualizing them as interactive HTML charts.
 
 </div>
 
-![Line Chart](imgs/linechart.png)
-![Heatmap](imgs/heatmap.png)
+![Line Chart](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/linechart.png)
+![Heatmap](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/heatmap.png)
 
 ## ✨ Features
 
@@ -100,7 +100,7 @@ The generated HTML contains:
 
 3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and an "Open Folder" button to open in VS Code.
 
-![alt text](imgs/repo.png)
+![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
 
 ## 📋 JSON Format

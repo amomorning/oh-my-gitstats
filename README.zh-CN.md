@@ -4,14 +4,14 @@
 
 # 📊 oh-my-gitstats
 
-中文 | [English](README.md)
+中文 | [English](https://github.com/amomorning/oh-my-gitstats/blob/main/README.md)
 
 一个 Python CLI 工具，用于批量收集 git commit 统计数据并生成交互式 HTML 图表。
 
 </div>
 
-![折线图](imgs/linechart.png)
-![热力图](imgs/heatmap.png)
+![折线图](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/linechart.png)
+![热力图](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/heatmap.png)
 
 ## ✨ 功能
 
@@ -100,7 +100,7 @@ gitstats visualize ./data --output ./output/stats.html
 
 3. **📊 独立热力图** - 每个仓库的日历视图，网格布局排列，显示同步状态指示器和"打开文件夹"按钮（在 VS Code 中打开）。
 
-![alt text](imgs/repo.png)
+![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
 
 ## 📋 JSON 格式

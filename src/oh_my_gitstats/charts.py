@@ -225,21 +225,47 @@ def build_heatmap_js_obj(
     all_data: List[Dict[str, Any]],
     date_range: tuple[str, str],
     years: List[str]
-) -> str:
-    """Build JS object string for heatmap data (all metric x year combos)."""
+) -> tuple[str, str]:
+    """Build JS object strings for heatmap data and active repo index.
+
+    Returns:
+        Tuple of (heatmap_js_obj, active_repos_js_obj).
+    """
     year_ranges: Dict[str, tuple[str, str]] = {"all": date_range}
     for year in years:
         year_ranges[year] = (f"{year}-01-01", f"{year}-12-31")
 
-    parts = []
+    heatmap_parts = []
+    active_parts = []
+
     for metric in METRICS:
-        year_parts = []
+        year_heatmap_parts = []
+        year_active_parts = []
+
         for year_key, year_range in year_ranges.items():
             agg = build_agg_heatmap_opts(all_data, year_range, metric)
             ind_list = build_ind_heatmap_opts(all_data, year_range, metric)
             ind_str = ",".join(ind_list)
-            year_parts.append(
+            year_heatmap_parts.append(
                 f'"{year_key}":{{"aggregate":{agg},"individual":[{ind_str}]}}'
             )
-        parts.append(f'"{metric}":{{{",".join(year_parts)}}}')
-    return "{" + ",".join(parts) + "}"
+
+            # Determine active repos for this metric x year combo
+            active_indices = []
+            for i, repo in enumerate(all_data):
+                for commit in repo["commits"]:
+                    ts = datetime.fromisoformat(commit["timestamp"])
+                    date_str = ts.strftime("%Y-%m-%d")
+                    if year_range[0] <= date_str <= year_range[1]:
+                        active_indices.append(i)
+                        break
+            year_active_parts.append(
+                f'"{year_key}":[{",".join(str(x) for x in active_indices)}]'
+            )
+
+        heatmap_parts.append(f'"{metric}":{{{",".join(year_heatmap_parts)}}}')
+        active_parts.append(f'"{metric}":{{{",".join(year_active_parts)}}}')
+
+    heatmap_js = "{" + ",".join(heatmap_parts) + "}"
+    active_js = "{" + ",".join(active_parts) + "}"
+    return heatmap_js, active_js
