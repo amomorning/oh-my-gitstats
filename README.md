@@ -1,8 +1,10 @@
 <div align="center">
 
-[中文](README.zh-CN.md) | English
+
 
 # 📊 oh-my-gitstats
+
+[中文](README.zh-CN.md) | English
 
 A Python CLI tool for collecting git commit statistics and visualizing them as interactive HTML charts.
 
