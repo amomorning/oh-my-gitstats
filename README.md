@@ -1,3 +1,5 @@
+[中文](README.zh-CN.md) | English
+
 # 📊 oh-my-gitstats
 
 A Python CLI tool for collecting git commit statistics and visualizing them as interactive HTML charts.
