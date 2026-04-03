@@ -1,8 +1,16 @@
+<div align="center">
+
 中文 | [English](README.md)
 
 # 📊 oh-my-gitstats
 
 一个 Python CLI 工具，用于批量收集 git commit 统计数据并生成交互式 HTML 图表。
+
+</div>
+
+![折线图](imgs/linechart.png)
+![热力图](imgs/heatmap.png)
+![alt text](imgs/repo.png)
 
 ## ✨ 功能
 
