@@ -77,6 +77,7 @@ Each repository generates a JSON file:
 {
   "repo_name": "my-project",
   "repo_path": "/absolute/path/to/my-project",
+  "sync_status": "synced",
   "commits": [
     {
       "timestamp": "2024-01-15T10:30:00",
@@ -86,6 +87,17 @@ Each repository generates a JSON file:
   ]
 }
 ```
+
+The `sync_status` field indicates the repository's sync state with its remote:
+
+| Status | Description |
+| ------ | ----------- |
+| `synced` | In sync with remote |
+| `local_changes` | Local has uncommitted changes, remote is up-to-date |
+| `remote_ahead` | Local is clean, but remote has new commits |
+| `diverged` | Local has uncommitted changes and remote has new commits |
+| `local_only_clean` | No remote configured, local is clean |
+| `local_only_dirty` | No remote configured, local has uncommitted changes |
 
 ## 🔧 Requirements
 

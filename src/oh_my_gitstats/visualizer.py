@@ -20,6 +20,15 @@ COLORS = [
     "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc", "#48b8d0"
 ]
 
+SYNC_STATUS_INFO = {
+    "synced":           {"emoji": "\u2705", "label": "Synced with remote"},
+    "local_changes":    {"emoji": "\u270f\ufe0f", "label": "Local changes, remote up-to-date"},
+    "remote_ahead":     {"emoji": "\u2b07\ufe0f", "label": "Remote has new commits"},
+    "diverged":         {"emoji": "\u26a0\ufe0f", "label": "Local changes + remote ahead"},
+    "local_only_clean": {"emoji": "\U0001f512", "label": "No remote, local clean"},
+    "local_only_dirty": {"emoji": "\U0001f527", "label": "No remote, local changes"},
+}
+
 
 def load_json_files(json_dir: str) -> List[Dict[str, Any]]:
     """Load all JSON files from a directory.
@@ -369,13 +378,20 @@ def generate_html(json_dir: str, output_path: str) -> str:
     date_range = get_date_range(all_data)
     years = get_years_from_data(all_data)
 
+    this_year = str(datetime.now().year)
+    default_year = this_year if this_year in years else "all"
+
     # Pre-compute all chart data
     line_js_obj = _build_line_js_obj(all_data)
     heatmap_js_obj = _build_heatmap_js_obj(all_data, date_range, years)
 
     # Get repo info for individual heatmaps
     repo_info = [
-        {"name": repo["repo_name"], "path": repo.get("repo_path", "")}
+        {
+            "name": repo["repo_name"],
+            "path": repo.get("repo_path", ""),
+            "sync_status": repo.get("sync_status", ""),
+        }
         for repo in all_data
     ]
 
@@ -472,6 +488,25 @@ def generate_html(json_dir: str, output_path: str) -> str:
         .open-folder-btn:hover {
             background: #357abd;
         }
+        .status-badge {
+            font-size: 16px;
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+        }
+        .sync-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 8px 0 16px;
+            font-size: 13px;
+            color: #666;
+        }
+        .sync-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .repo-path {
             font-size: 11px;
             color: #888;
@@ -489,7 +524,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
             <div class="controls">
                 <select class="selector" id="metric-selector" onchange="onMetricChange(this.value)">
                     <option value="changes">Lines Changed</option>
-                    <option value="commits">Commit Count</option>
+                    <option value="commits" selected>Commit Count</option>
                 </select>
                 <select class="selector" id="granularity-selector" onchange="onGranularityChange(this.value)">
                     <option value="day">Day</option>
@@ -507,7 +542,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
             <select class="selector" id="aggregate-year-selector" onchange="updateAggregateHeatmap(this.value)">
                 <option value="all">All Years</option>
                 {% for year in years %}
-                <option value="{{ year }}">{{ year }}</option>
+                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -520,18 +555,28 @@ def generate_html(json_dir: str, output_path: str) -> str:
             <select class="selector" id="individual-year-selector" onchange="updateIndividualHeatmaps(this.value)">
                 <option value="all">All Years</option>
                 {% for year in years %}
-                <option value="{{ year }}">{{ year }}</option>
+                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="sync-legend">
+            {% for item in sync_legend %}
+            <span class="sync-legend-item">{{ item.emoji }} {{ item.label }}</span>
+            {% endfor %}
         </div>
         <div class="heatmaps-grid">
             {% for item in individual_charts %}
             <div class="heatmap-card">
                 <div class="repo-header">
                     <span class="repo-name">{{ item.name }}</span>
-                    <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
-                        📂 Open Folder
-                    </button>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        {% if item.sync_emoji %}
+                        <span class="status-badge" title="{{ item.sync_label }}">{{ item.sync_emoji }}</span>
+                        {% endif %}
+                        <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
+                            📂 Open Folder
+                        </button>
+                    </div>
                 </div>
                 <div class="repo-path">{{ item.path }}</div>
                 <div class="chart-container" id="{{ item.id }}" style="height:160px;"></div>
@@ -546,7 +591,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
         var heatmapData = {{ heatmap_js_obj }};
 
         // Current state
-        var currentMetric = 'changes';
+        var currentMetric = 'commits';
         var currentGranularity = 'week';
 
         // Open folder function
@@ -563,8 +608,9 @@ def generate_html(json_dir: str, output_path: str) -> str:
         window.addEventListener('resize', function() { lineChart.resize(); });
 
         // Aggregate heatmap
+        var currentYear = '{{ current_year }}';
         var aggregateChart = echarts.init(document.getElementById('aggregate-heatmap'));
-        aggregateChart.setOption(heatmapData[currentMetric]['all'].aggregate);
+        aggregateChart.setOption(heatmapData[currentMetric][currentYear].aggregate);
         window.addEventListener('resize', function() { aggregateChart.resize(); });
 
         // Individual heatmaps
@@ -579,7 +625,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
 
         // Initialize individual heatmaps
         for (var i = 0; i < individualCharts.length; i++) {
-            individualCharts[i].setOption(heatmapData[currentMetric]['all'].individual[i]);
+            individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
         }
 
         // Control handlers
@@ -622,10 +668,14 @@ def generate_html(json_dir: str, output_path: str) -> str:
     individual_charts_data = []
     for idx, repo in enumerate(repo_info):
         chart_id = f"individual-heatmap-{idx}"
+        status = repo.get("sync_status", "")
+        info = SYNC_STATUS_INFO.get(status, {}) if status else {}
         individual_charts_data.append({
             "id": chart_id,
             "name": repo["name"],
-            "path": rewrite_path(repo["path"])
+            "path": rewrite_path(repo["path"]),
+            "sync_emoji": info.get("emoji", ""),
+            "sync_label": info.get("label", ""),
         })
 
     # Render HTML
@@ -633,7 +683,12 @@ def generate_html(json_dir: str, output_path: str) -> str:
         line_js_obj=line_js_obj,
         heatmap_js_obj=heatmap_js_obj,
         years=years,
-        individual_charts=individual_charts_data
+        individual_charts=individual_charts_data,
+        sync_legend=[
+            {"emoji": v["emoji"], "label": v["label"]}
+            for v in SYNC_STATUS_INFO.values()
+        ],
+        current_year=default_year
     )
 
     # Write to file

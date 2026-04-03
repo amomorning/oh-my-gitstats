@@ -44,10 +44,15 @@ Click group with two subcommands:
 
 ### `collector.py`
 
+Module-level enum:
+
+- `SyncStatus(str, Enum)` — 6 possible values: `synced`, `local_changes`, `remote_ahead`, `diverged`, `local_only_clean`, `local_only_dirty`
+
 Key functions:
 
 - `find_git_repos(root_path)` → `List[Path]` — recursive `.git` search
-- `extract_commit_data(repo_path)` → `Dict` — extracts commits with timestamp/additions/deletions
+- `extract_commit_data(repo_path)` → `Dict` — extracts commits with timestamp/additions/deletions + sync status
+- `_get_sync_status(repo_path)` → `SyncStatus` — private helper, checks dirty state and fetches remote to determine sync status
 - `_parse_commit(commit)` → `Dict[str, Any]` — private helper, parses a single GitPython Commit object
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
 - `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — main collection entry point
@@ -94,6 +99,7 @@ Each file in `data/` is named `{repo_name}.json`:
 {
   "repo_name": "my-project",
   "repo_path": "/absolute/path/to/my-project",
+  "sync_status": "synced",
   "commits": [
     {
       "timestamp": "2024-01-15T10:30:00+08:00",
@@ -103,6 +109,8 @@ Each file in `data/` is named `{repo_name}.json`:
   ]
 }
 ```
+
+`sync_status` values: `synced` | `local_changes` | `remote_ahead` | `diverged` | `local_only_clean` | `local_only_dirty`
 
 ## Dependencies
 

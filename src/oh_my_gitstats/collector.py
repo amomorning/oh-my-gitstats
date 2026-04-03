@@ -3,10 +3,22 @@
 import json
 import os
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Any
 
 from git import Repo, Commit
+
+
+class SyncStatus(str, Enum):
+    """Git repository sync status with remote."""
+
+    SYNCED = "synced"
+    LOCAL_CHANGES = "local_changes"
+    REMOTE_AHEAD = "remote_ahead"
+    DIVERGED = "diverged"
+    LOCAL_ONLY_CLEAN = "local_only_clean"
+    LOCAL_ONLY_DIRTY = "local_only_dirty"
 
 
 def find_git_repos(root_path: str) -> List[Path]:
@@ -50,8 +62,43 @@ def extract_commit_data(repo_path: Path) -> Dict[str, Any]:
     return {
         "repo_name": repo_path.name,
         "repo_path": str(repo_path.absolute()),
+        "sync_status": _get_sync_status(repo_path),
         "commits": commits
     }
+
+
+def _get_sync_status(repo_path: Path) -> SyncStatus:
+    """Check sync status between local repo and its remote.
+
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        SyncStatus enum indicating the sync state.
+    """
+    repo = Repo(repo_path)
+    is_dirty = repo.is_dirty(untracked_files=True)
+
+    try:
+        origin = repo.remote("origin")
+        origin.fetch()
+        active_branch = repo.active_branch
+        tracking = active_branch.tracking_branch()
+        if tracking:
+            behind = list(repo.iter_commits(f"{active_branch}..{tracking}"))
+            remote_ahead = len(behind) > 0
+        else:
+            remote_ahead = False
+    except Exception:
+        return SyncStatus.LOCAL_ONLY_DIRTY if is_dirty else SyncStatus.LOCAL_ONLY_CLEAN
+
+    if is_dirty and remote_ahead:
+        return SyncStatus.DIVERGED
+    if is_dirty:
+        return SyncStatus.LOCAL_CHANGES
+    if remote_ahead:
+        return SyncStatus.REMOTE_AHEAD
+    return SyncStatus.SYNCED
 
 
 def _parse_commit(commit: Commit) -> Dict[str, Any]:
