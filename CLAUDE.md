@@ -4,7 +4,7 @@ Python CLI tool that batch-collects git commit data from multiple repositories a
 
 ## Directory Structure
 
-```
+```text
 oh-my-gitstats/
 ├── CLAUDE.md                      # This file
 ├── pyproject.toml                 # Project config, dependencies, entry point
@@ -15,7 +15,11 @@ oh-my-gitstats/
     ├── __init__.py                # Package init, version
     ├── cli.py                     # Click CLI entry point (collect / visualize)
     ├── collector.py               # Git data extraction via GitPython
-    └── visualizer.py              # HTML chart generation via pyecharts + Jinja2
+    ├── constants.py               # Shared constants (metrics, colors, sync status)
+    ├── data.py                    # JSON loading, date helpers, aggregation
+    ├── charts.py                  # pyecharts chart building + JS object assembly
+    ├── template.html              # Jinja2 HTML template for the output page
+    └── visualizer.py              # Orchestration: generate_html entry point
 ```
 
 ## CLI Commands
@@ -57,29 +61,44 @@ Key functions:
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
 - `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — main collection entry point
 
-### `visualizer.py`
+### `constants.py`
 
 Module-level constants:
 
 - `METRICS = ("changes", "commits")` — supported metric types
 - `GRANULARITIES = ("day", "week", "month")` — supported time granularities
 - `COLORS` — list of 10 hex color strings for chart series
+- `SYNC_STATUS_INFO` — dict mapping sync status strings to `{emoji, label}` dicts
 
-Public functions:
+### `data.py`
+
+Pure data manipulation functions (no chart library dependency):
 
 - `load_json_files(json_dir)` — loads all `*.json` from a directory
 - `aggregate_by_period(commits, granularity, metric="changes")` — groups by day/week/month; metric `"changes"` sums additions+deletions, `"commits"` counts commits
-- `get_date_range(all_data)` / `get_years_from_data(all_data)` — date helpers
-- `rewrite_path(path)` → `str` — replaces backslashes with forward slashes (for JS compatibility)
-- `generate_html(json_dir, output_path)` — main entry, builds complete HTML
+- `get_date_range(all_data)` → `tuple[str, str]` — overall (min_date, max_date)
+- `get_years_from_data(all_data)` → `List[str]` — unique years in descending order
+- `rewrite_path(path)` → `str` — replaces backslashes with forward slashes
 
-Private functions:
+### `charts.py`
 
-- `_build_line_opts(all_data, granularity, metric)` → JSON string — builds pyecharts Line chart options
-- `_build_agg_heatmap_opts(all_data, date_range, metric)` → JSON string — builds aggregate Calendar heatmap options
-- `_build_ind_heatmap_opts(all_data, date_range, metric)` → `List[str]` — builds individual Calendar heatmap options per repo
-- `_build_line_js_obj(all_data)` → JS object string — pre-computes all metric×granularity combinations (6 charts) as embedded JS
-- `_build_heatmap_js_obj(all_data, date_range, years)` → JS object string — pre-computes all metric×year-range combinations as embedded JS
+pyecharts chart building and JS object assembly:
+
+- `build_line_opts(all_data, granularity, metric)` → JSON string — builds Line chart options
+- `build_agg_heatmap_opts(all_data, date_range, metric)` → JSON string — builds aggregate Calendar heatmap options
+- `build_ind_heatmap_opts(all_data, date_range, metric)` → `List[str]` — builds individual Calendar heatmap options per repo
+- `build_line_js_obj(all_data)` → JS object string — pre-computes all metric×granularity combinations (6 charts) as embedded JS
+- `build_heatmap_js_obj(all_data, date_range, years)` → JS object string — pre-computes all metric×year-range combinations as embedded JS
+
+### `template.html`
+
+Jinja2 HTML template loaded at runtime by `visualizer.py`. Contains CSS styles, HTML structure with three card sections (Line Chart, Aggregate Heatmap, Individual Heatmaps), and client-side JavaScript for chart initialization and interactive controls.
+
+### `visualizer.py`
+
+Single public function:
+
+- `generate_html(json_dir, output_path)` → `str` — orchestrates the full pipeline: load data → compute charts → render template → write file
 
 ### Architecture: Pre-computation Strategy
 
@@ -89,7 +108,7 @@ The generated HTML provides:
 
 1. **Line Chart** — metric dropdown (Lines Changed / Commit Count) + granularity dropdown (Day/Week/Month)
 2. **Aggregate Heatmap** — year selector dropdown (All Years / specific year)
-3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with year selector and "Open Folder" button (`vscode://file/` URI)
+3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with sync status emoji, year selector and "Open Folder" button (`vscode://file/` URI)
 
 ## JSON Data Format
 

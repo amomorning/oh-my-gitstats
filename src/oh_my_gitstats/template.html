@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Git Stats Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 24px;
+            color: #333;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .selector {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .chart-container {
+            width: 100%;
+        }
+        .heatmaps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
+            gap: 20px;
+        }
+        .heatmap-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .heatmap-card .chart-container {
+            height: 180px;
+        }
+        .repo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .repo-name {
+            font-weight: 600;
+            color: #333;
+        }
+        .open-folder-btn {
+            background: #4a90d9;
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .open-folder-btn:hover {
+            background: #357abd;
+        }
+        .status-badge {
+            font-size: 16px;
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+        }
+        .sync-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 8px 0 16px;
+            font-size: 13px;
+            color: #666;
+        }
+        .sync-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .repo-path {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Git Stats Visualization</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">📈 Commit Activity Over Time</span>
+            <div class="controls">
+                <select class="selector" id="metric-selector" onchange="onMetricChange(this.value)">
+                    <option value="changes">Lines Changed</option>
+                    <option value="commits" selected>Commit Count</option>
+                </select>
+                <select class="selector" id="granularity-selector" onchange="onGranularityChange(this.value)">
+                    <option value="day">Day</option>
+                    <option value="week" selected>Week</option>
+                    <option value="month">Month</option>
+                </select>
+            </div>
+        </div>
+        <div class="chart-container" id="line-chart" style="height:500px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🗓️ Aggregated Commit Activity</span>
+            <select class="selector" id="aggregate-year-selector" onchange="updateAggregateHeatmap(this.value)">
+                <option value="all">All Years</option>
+                {% for year in years %}
+                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="chart-container" id="aggregate-heatmap" style="height:300px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">📁 Individual Repository Heatmaps</span>
+            <select class="selector" id="individual-year-selector" onchange="updateIndividualHeatmaps(this.value)">
+                <option value="all">All Years</option>
+                {% for year in years %}
+                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="sync-legend">
+            {% for item in sync_legend %}
+            <span class="sync-legend-item">{{ item.emoji }} {{ item.label }}</span>
+            {% endfor %}
+        </div>
+        <div class="heatmaps-grid">
+            {% for item in individual_charts %}
+            <div class="heatmap-card">
+                <div class="repo-header">
+                    <span class="repo-name">{{ item.name }}</span>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        {% if item.sync_emoji %}
+                        <span class="status-badge" title="{{ item.sync_label }}">{{ item.sync_emoji }}</span>
+                        {% endif %}
+                        <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
+                            📂 Open Folder
+                        </button>
+                    </div>
+                </div>
+                <div class="repo-path">{{ item.path }}</div>
+                <div class="chart-container" id="{{ item.id }}" style="height:160px;"></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        // Pre-computed chart data
+        var lineData = {{ line_js_obj }};
+        var heatmapData = {{ heatmap_js_obj }};
+
+        // Current state
+        var currentMetric = 'commits';
+        var currentGranularity = 'week';
+
+        // Open folder function
+        function openFolder(path) {
+            var vscodeUrl = 'vscode://file/' + path.replace(/\\\\/g, '/');
+            var link = document.createElement('a');
+            link.href = vscodeUrl;
+            link.click();
+        }
+
+        // Line chart
+        var lineChart = echarts.init(document.getElementById('line-chart'));
+        lineChart.setOption(lineData[currentMetric][currentGranularity]);
+        window.addEventListener('resize', function() { lineChart.resize(); });
+
+        // Aggregate heatmap
+        var currentYear = '{{ current_year }}';
+        var aggregateChart = echarts.init(document.getElementById('aggregate-heatmap'));
+        aggregateChart.setOption(heatmapData[currentMetric][currentYear].aggregate);
+        window.addEventListener('resize', function() { aggregateChart.resize(); });
+
+        // Individual heatmaps
+        var individualCharts = [];
+        {% for item in individual_charts %}
+        (function() {
+            var chart = echarts.init(document.getElementById('{{ item.id }}'));
+            individualCharts.push(chart);
+            window.addEventListener('resize', function() { chart.resize(); });
+        })();
+        {% endfor %}
+
+        // Initialize individual heatmaps
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
+        }
+
+        // Control handlers
+        function onMetricChange(metric) {
+            currentMetric = metric;
+            lineChart.setOption(lineData[currentMetric][currentGranularity], true);
+
+            var year = document.getElementById('aggregate-year-selector').value;
+            aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
+            for (var i = 0; i < individualCharts.length; i++) {
+                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+            }
+        }
+
+        function onGranularityChange(granularity) {
+            currentGranularity = granularity;
+            lineChart.setOption(lineData[currentMetric][currentGranularity], true);
+        }
+
+        function updateAggregateHeatmap(year) {
+            aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
+            document.getElementById('individual-year-selector').value = year;
+            for (var i = 0; i < individualCharts.length; i++) {
+                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+            }
+        }
+
+        function updateIndividualHeatmaps(year) {
+            document.getElementById('aggregate-year-selector').value = year;
+            for (var i = 0; i < individualCharts.length; i++) {
+                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+            }
+        }
+    </script>
+</body>
+</html>
