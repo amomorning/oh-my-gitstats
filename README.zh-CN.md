@@ -33,7 +33,7 @@ pip install oh-my-gitstats
 ### 从源码安装（开发）
 
 ```bash
-git clone https://github.com/yourusername/oh-my-gitstats.git
+git clone https://github.com/amomorning/oh-my-gitstats.git
 cd oh-my-gitstats
 pip install -e .
 ```

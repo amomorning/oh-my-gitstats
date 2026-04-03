@@ -2,13 +2,35 @@
 name = "oh-my-gitstats"
 version = "0.1.0"
 description = "Git repository commit statistics collector and visualizer"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.9"
+authors = [
+    { name = "amomorning", email = "amomorning@gmail.com" },
+]
+keywords = ["git", "statistics", "visualization", "commit", "heatmap", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+]
 dependencies = [
     "click>=8.0",
     "gitpython>=3.1",
     "pyecharts>=2.0",
     "jinja2>=3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/amomorning/oh-my-gitstats"
+Repository = "https://github.com/amomorning/oh-my-gitstats"
+Issues = "https://github.com/amomorning/oh-my-gitstats/issues"
 
 [project.scripts]
 gitstats = "oh_my_gitstats.cli:main"
@@ -19,3 +41,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+oh_my_gitstats = ["template.html"]
