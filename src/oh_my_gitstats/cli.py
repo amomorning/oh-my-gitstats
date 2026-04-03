@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from .collector import collect_all_repos
+from .collector import collect_all_repos, sync_repos
 from .visualizer import generate_html
 
 
@@ -42,6 +42,26 @@ def collect(path: str, output: str, quiet: bool):
 
     if not verbose:
         print(f"Saved {len(saved_files)} files to {output}")
+
+
+@main.command()
+@click.argument(
+    "data_dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    "-q", "--quiet",
+    is_flag=True,
+    help="Suppress output messages",
+)
+def sync(data_dir: str, quiet: bool):
+    """Incrementally update JSON files in DATA_DIR with new commits.
+
+    Only fetches commits newer than the latest commit in each existing
+    JSON file, making it much faster than a full collect.
+    """
+    verbose = not quiet
+    sync_repos(data_dir, verbose=verbose)
 
 
 @main.command()

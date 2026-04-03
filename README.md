@@ -5,6 +5,7 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 ## ✨ Features
 
 - 🔍 **Batch Collection** - Scan multiple git repositories recursively
+- ⚡ **Incremental Sync** - Only fetch new commits since last collection
 - 📈 **Line Charts** - Track changes over time with metric & granularity switching
 - 🗓️ **Calendar Heatmaps** - Visualize commit activity with year-based filtering
 - 🎯 **Aggregated & Individual Views** - See combined or per-repo statistics
@@ -43,7 +44,26 @@ gitstats collect /path/to/repos --output ./data
 | `-o, --output` | Directory to save JSON files (default: `./data`) |
 | `-q, --quiet` | Suppress output messages |
 
-### 2️⃣ Generate Visualization
+### 2️⃣ Incremental Sync
+
+You may collect repos from multiple locations into the same `data` directory. Re-running `collect` on every location is slow — `sync` reads the existing JSON files and only fetches new commits for each repo:
+
+```bash
+# Collect from multiple locations (one-time)
+gitstats collect /path/to/work-projects --output ./data
+gitstats collect /path/to/personal-projects --output ./data
+
+# Later, update all at once — only new commits
+gitstats sync ./data
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-q, --quiet` | Suppress output messages |
+
+### 3️⃣ Generate Visualization
 
 Create an interactive HTML file from collected data:
 
@@ -67,7 +87,7 @@ The generated HTML contains:
 
 2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
 
-3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with an "Open Folder" button to open in VS Code.
+3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and an "Open Folder" button to open in VS Code.
 
 ## 📋 JSON Format
 

@@ -140,6 +140,99 @@ def save_repo_data(data: Dict[str, Any], output_dir: Path) -> Path:
     return filepath
 
 
+def sync_repo_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Incrementally update a single repo's data with new commits.
+
+    Args:
+        data: Existing repository data dictionary (from JSON).
+
+    Returns:
+        Updated dictionary with new commits appended and sync_status refreshed.
+    """
+    repo_path = Path(data["repo_path"])
+    repo = Repo(repo_path)
+
+    existing_commits = data.get("commits", [])
+    existing_ts_set = {c["timestamp"] for c in existing_commits}
+
+    new_commits = []
+    if existing_commits:
+        last_ts = datetime.fromisoformat(existing_commits[-1]["timestamp"])
+        for commit in repo.iter_commits(since=last_ts):
+            parsed = _parse_commit(commit)
+            if parsed["timestamp"] not in existing_ts_set:
+                new_commits.append(parsed)
+    else:
+        # No existing commits — full scan fallback
+        for commit in repo.iter_commits():
+            new_commits.append(_parse_commit(commit))
+
+    all_commits = existing_commits + new_commits
+    all_commits.sort(key=lambda x: x["timestamp"])
+
+    return {
+        "repo_name": data["repo_name"],
+        "repo_path": data["repo_path"],
+        "sync_status": _get_sync_status(repo_path),
+        "commits": all_commits,
+    }
+
+
+def sync_repos(data_dir: str, verbose: bool = True) -> List[Path]:
+    """Incrementally update existing JSON files with new commits.
+
+    Args:
+        data_dir: Directory containing existing JSON files.
+        verbose: Whether to print progress messages.
+
+    Returns:
+        List of paths to updated JSON files.
+    """
+    data_path = Path(data_dir)
+    json_files = list(data_path.glob("*.json"))
+
+    if not json_files:
+        if verbose:
+            print("No JSON files found in data directory")
+        return []
+
+    if verbose:
+        print(f"Syncing {len(json_files)} repositories")
+
+    saved_files = []
+
+    for json_file in json_files:
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        repo_path = Path(data["repo_path"])
+        if not repo_path.is_dir() or not (repo_path / ".git").is_dir():
+            if verbose:
+                print(f"  Skipped (repo not found): {data['repo_name']}")
+            continue
+
+        if verbose:
+            print(f"Syncing: {data['repo_name']}")
+
+        old_count = len(data.get("commits", []))
+        try:
+            updated = sync_repo_data(data)
+            filepath = save_repo_data(updated, data_path)
+            saved_files.append(filepath)
+
+            new_count = len(updated["commits"]) - old_count
+            if verbose:
+                print(f"  +{new_count} new commits")
+        except Exception as e:
+            if verbose:
+                print(f"  Error: {e}")
+
+    if verbose:
+        print(f"\nSynced {len(saved_files)} repositories")
+
+    return saved_files
+
+
 def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True) -> List[Path]:
     """Collect commit data from all git repos under root_path.
 

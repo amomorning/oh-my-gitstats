@@ -13,7 +13,7 @@ oh-my-gitstats/
 ├── output/                        # Generated HTML visualizations
 └── src/oh_my_gitstats/
     ├── __init__.py                # Package init, version
-    ├── cli.py                     # Click CLI entry point (collect / visualize)
+    ├── cli.py                     # Click CLI entry point (collect / sync / visualize)
     ├── collector.py               # Git data extraction via GitPython
     ├── constants.py               # Shared constants (metrics, colors, sync status)
     ├── data.py                    # JSON loading, date helpers, aggregation
@@ -31,6 +31,9 @@ pip install -e .
 # Collect commit data from all repos under a directory
 gitstats collect /path/to/repos --output ./data
 
+# Incrementally update existing JSON files (only new commits)
+gitstats sync ./data
+
 # Generate HTML visualization
 gitstats visualize ./data --output ./output/stats.html
 ```
@@ -41,9 +44,10 @@ Entry point defined in `pyproject.toml`: `gitstats = "oh_my_gitstats.cli:main"`
 
 ### `cli.py`
 
-Click group with two subcommands:
+Click group with three subcommands:
 
 - `collect` — scans directory recursively for `.git`, extracts commits, saves JSON. Options: `--output` (default `./data`), `--quiet` (suppress output).
+- `sync` — incrementally updates existing JSON files in a data directory. Only fetches commits newer than the latest commit already recorded. Skips repos whose directory no longer exists. Options: `--quiet`.
 - `visualize` — reads JSON files, generates single HTML with ECharts. Options: `--output` (default `./output/stats.html`). Granularity and metric selection are handled in-browser via JS dropdowns.
 
 ### `collector.py`
@@ -59,7 +63,9 @@ Key functions:
 - `_get_sync_status(repo_path)` → `SyncStatus` — private helper, checks dirty state and fetches remote to determine sync status
 - `_parse_commit(commit)` → `Dict[str, Any]` — private helper, parses a single GitPython Commit object
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
-- `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — main collection entry point
+- `sync_repo_data(data)` → `Dict` — incrementally updates a single repo's data (new commits only, refreshed sync status)
+- `sync_repos(data_dir, verbose=True)` → `List[Path]` — incremental sync entry point; reads existing JSON files, updates each with new commits
+- `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — full collection entry point
 
 ### `constants.py`
 
