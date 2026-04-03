@@ -28,7 +28,7 @@ pip install -e .
 gitstats collect /path/to/repos --output ./data
 
 # Generate HTML visualization
-gitstats visualize ./data --output ./output/stats.html --granularity week
+gitstats visualize ./data --output ./output/stats.html
 ```
 
 Entry point defined in `pyproject.toml`: `gitstats = "oh_my_gitstats.cli:main"`
@@ -39,8 +39,8 @@ Entry point defined in `pyproject.toml`: `gitstats = "oh_my_gitstats.cli:main"`
 
 Click group with two subcommands:
 
-- `collect` — scans directory recursively for `.git`, extracts commits, saves JSON
-- `visualize` — reads JSON files, generates single HTML with ECharts
+- `collect` — scans directory recursively for `.git`, extracts commits, saves JSON. Options: `--output` (default `./data`), `--quiet` (suppress output).
+- `visualize` — reads JSON files, generates single HTML with ECharts. Options: `--output` (default `./output/stats.html`). Granularity and metric selection are handled in-browser via JS dropdowns.
 
 ### `collector.py`
 
@@ -48,21 +48,43 @@ Key functions:
 
 - `find_git_repos(root_path)` → `List[Path]` — recursive `.git` search
 - `extract_commit_data(repo_path)` → `Dict` — extracts commits with timestamp/additions/deletions
+- `_parse_commit(commit)` → `Dict[str, Any]` — private helper, parses a single GitPython Commit object
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
-- `collect_all_repos(root_path, output_dir)` → `List[Path]` — main collection entry point
+- `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — main collection entry point
 
 ### `visualizer.py`
 
-Key functions:
+Module-level constants:
+
+- `METRICS = ("changes", "commits")` — supported metric types
+- `GRANULARITIES = ("day", "week", "month")` — supported time granularities
+- `COLORS` — list of 10 hex color strings for chart series
+
+Public functions:
 
 - `load_json_files(json_dir)` — loads all `*.json` from a directory
-- `aggregate_by_period(commits, granularity)` — groups by day/week/month
+- `aggregate_by_period(commits, granularity, metric="changes")` — groups by day/week/month; metric `"changes"` sums additions+deletions, `"commits"` counts commits
 - `get_date_range(all_data)` / `get_years_from_data(all_data)` — date helpers
-- `build_daily_repo_map(all_data)` — date → [{name, changes}] mapping for heatmap tooltips
-- `create_line_chart_for_range(all_data, granularity, date_range)` → JSON string
-- `create_aggregate_heatmap_for_range(all_data, date_range)` → JSON string
-- `create_individual_heatmap_for_range(all_data, date_range)` → `List[str]`
-- `generate_html(json_dir, output_path, granularity)` — main entry, builds complete HTML
+- `rewrite_path(path)` → `str` — replaces backslashes with forward slashes (for JS compatibility)
+- `generate_html(json_dir, output_path)` — main entry, builds complete HTML
+
+Private functions:
+
+- `_build_line_opts(all_data, granularity, metric)` → JSON string — builds pyecharts Line chart options
+- `_build_agg_heatmap_opts(all_data, date_range, metric)` → JSON string — builds aggregate Calendar heatmap options
+- `_build_ind_heatmap_opts(all_data, date_range, metric)` → `List[str]` — builds individual Calendar heatmap options per repo
+- `_build_line_js_obj(all_data)` → JS object string — pre-computes all metric×granularity combinations (6 charts) as embedded JS
+- `_build_heatmap_js_obj(all_data, date_range, years)` → JS object string — pre-computes all metric×year-range combinations as embedded JS
+
+### Architecture: Pre-computation Strategy
+
+All metric×granularity combinations are pre-computed at HTML generation time and embedded as JavaScript global objects. Users switch between them dynamically in the browser via dropdown controls — no page reload needed.
+
+The generated HTML provides:
+
+1. **Line Chart** — metric dropdown (Lines Changed / Commit Count) + granularity dropdown (Day/Week/Month)
+2. **Aggregate Heatmap** — year selector dropdown (All Years / specific year)
+3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with year selector and "Open Folder" button (`vscode://file/` URI)
 
 ## JSON Data Format
 

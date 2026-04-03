@@ -3,7 +3,8 @@
     "allow": [
       "Bash(gitstats visualize:*)",
       "Bash(pip install:*)",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Bash(git -C /c/Users/amomo/Desktop/projects/oh-my-gitstats log --oneline --all)"
     ]
   }
 }
