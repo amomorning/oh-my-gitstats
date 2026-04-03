@@ -111,6 +111,7 @@ gitstats visualize ./data --output ./output/stats.html
 {
   "repo_name": "my-project",
   "repo_path": "/absolute/path/to/my-project",
+  "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
   "commits": [
     {
@@ -122,16 +123,18 @@ gitstats visualize ./data --output ./output/stats.html
 }
 ```
 
+`last_commit_hash` 字段记录采集时的 HEAD commit hash。执行 `sync` 时，hash 未变化的仓库会被直接跳过，无需执行任何 git 操作。
+
 `sync_status` 字段表示仓库与远程的同步状态：
 
 | 状态 | 说明 |
 |------|------|
-| `synced` | 与远程同步 |
-| `local_changes` | 本地有未提交更改，远程无更新 |
-| `remote_ahead` | 本地干净，但远程有新提交 |
-| `diverged` | 本地有未提交更改且远程有新提交 |
-| `local_only_clean` | 无远程仓库，本地干净 |
-| `local_only_dirty` | 无远程仓库，本地有未提交更改 |
+| ✅ `synced` | 与远程同步 |
+| ✏️ `local_changes` | 本地有未提交更改，远程无更新 |
+| ⬇️ `remote_ahead` | 本地干净，但远程有新提交 |
+| ⚠️ `diverged` | 本地有未提交更改且远程有新提交 |
+| 🔒 `local_only_clean` | 无远程仓库，本地干净 |
+| 🔧 `local_only_dirty` | 无远程仓库，本地有未提交更改 |
 
 ## 🔧 依赖
 

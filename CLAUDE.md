@@ -59,12 +59,13 @@ Module-level enum:
 Key functions:
 
 - `find_git_repos(root_path)` → `List[Path]` — recursive `.git` search
-- `extract_commit_data(repo_path)` → `Dict` — extracts commits with timestamp/additions/deletions + sync status
+- `extract_commit_data(repo_path)` → `Dict` — extracts commits with timestamp/additions/deletions + sync status + HEAD hash
 - `_get_sync_status(repo_path)` → `SyncStatus` — private helper, checks dirty state and fetches remote to determine sync status
+- `_read_head_hash(repo_path)` → `str | None` — private helper, reads HEAD commit hash directly from `.git` files (no GitPython)
 - `_parse_commit(commit)` → `Dict[str, Any]` — private helper, parses a single GitPython Commit object
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
 - `sync_repo_data(data)` → `Dict` — incrementally updates a single repo's data (new commits only, refreshed sync status)
-- `sync_repos(data_dir, verbose=True)` → `List[Path]` — incremental sync entry point; reads existing JSON files, updates each with new commits
+- `sync_repos(data_dir, verbose=True)` → `List[Path]` — incremental sync entry point; reads existing JSON files, skips repos with unchanged HEAD hash, updates the rest with new commits
 - `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — full collection entry point
 
 ### `constants.py`
@@ -124,6 +125,7 @@ Each file in `data/` is named `{repo_name}.json`:
 {
   "repo_name": "my-project",
   "repo_path": "/absolute/path/to/my-project",
+  "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
   "commits": [
     {

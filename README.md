@@ -111,6 +111,7 @@ Each repository generates a JSON file:
 {
   "repo_name": "my-project",
   "repo_path": "/absolute/path/to/my-project",
+  "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
   "commits": [
     {
@@ -122,16 +123,18 @@ Each repository generates a JSON file:
 }
 ```
 
+The `last_commit_hash` field stores the HEAD commit hash at collection time. During `sync`, repositories with a matching hash are skipped instantly — no git operations needed.
+
 The `sync_status` field indicates the repository's sync state with its remote:
 
 | Status | Description |
 | ------ | ----------- |
-| `synced` | In sync with remote |
-| `local_changes` | Local has uncommitted changes, remote is up-to-date |
-| `remote_ahead` | Local is clean, but remote has new commits |
-| `diverged` | Local has uncommitted changes and remote has new commits |
-| `local_only_clean` | No remote configured, local is clean |
-| `local_only_dirty` | No remote configured, local has uncommitted changes |
+| ✅ `synced` | In sync with remote |
+| ✏️ `local_changes` | Local has uncommitted changes, remote is up-to-date |
+| ⬇️ `remote_ahead` | Local is clean, but remote has new commits |
+| ⚠️ `diverged` | Local has uncommitted changes and remote has new commits |
+| 🔒 `local_only_clean` | No remote configured, local is clean |
+| 🔧 `local_only_dirty` | No remote configured, local has uncommitted changes |
 
 ## 🔧 Requirements
 

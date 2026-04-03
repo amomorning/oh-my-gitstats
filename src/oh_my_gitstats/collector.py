@@ -62,6 +62,7 @@ def extract_commit_data(repo_path: Path) -> Dict[str, Any]:
     return {
         "repo_name": repo_path.name,
         "repo_path": str(repo_path.absolute()),
+        "last_commit_hash": _read_head_hash(repo_path),
         "sync_status": _get_sync_status(repo_path),
         "commits": commits
     }
@@ -99,6 +100,36 @@ def _get_sync_status(repo_path: Path) -> SyncStatus:
     if remote_ahead:
         return SyncStatus.REMOTE_AHEAD
     return SyncStatus.SYNCED
+
+
+def _read_head_hash(repo_path: Path) -> str | None:
+    """Read HEAD commit hash directly from .git files, no GitPython.
+
+    Args:
+        repo_path: Path to the git repository.
+
+    Returns:
+        HEAD commit hash string, or None if it cannot be determined.
+    """
+    git_dir = repo_path / ".git"
+    head_file = git_dir / "HEAD"
+    if not head_file.exists():
+        return None
+
+    head = head_file.read_text().strip()
+    if head.startswith("ref: "):
+        ref_path = git_dir / head[5:]
+        if ref_path.exists():
+            return ref_path.read_text().strip()
+        # packed-refs fallback
+        packed = git_dir / "packed-refs"
+        if packed.exists():
+            ref_name = head[5:]
+            for line in packed.read_text().splitlines():
+                if line.endswith(f" {ref_name}"):
+                    return line.split()[0]
+        return None
+    return head  # detached HEAD
 
 
 def _parse_commit(commit: Commit) -> Dict[str, Any]:
@@ -173,6 +204,7 @@ def sync_repo_data(data: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "repo_name": data["repo_name"],
         "repo_path": data["repo_path"],
+        "last_commit_hash": _read_head_hash(repo_path),
         "sync_status": _get_sync_status(repo_path),
         "commits": all_commits,
     }
@@ -213,6 +245,14 @@ def sync_repos(data_dir: str, verbose: bool = True) -> List[Path]:
 
         if verbose:
             print(f"Syncing: {data['repo_name']}")
+
+        # Fast skip: compare HEAD hash without opening GitPython
+        stored_hash = data.get("last_commit_hash")
+        current_hash = _read_head_hash(repo_path)
+        if stored_hash and current_hash and stored_hash == current_hash:
+            if verbose:
+                print("  Skipped (no changes)")
+            continue
 
         old_count = len(data.get("commits", []))
         try:
