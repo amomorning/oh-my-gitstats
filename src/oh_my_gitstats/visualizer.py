@@ -154,7 +154,17 @@ def _build_line_opts(
     y_name = "Lines Changed" if metric == "changes" else "Commits"
 
     line.set_global_opts(
-        tooltip_opts=opts.TooltipOpts(trigger="axis"),
+        tooltip_opts=opts.TooltipOpts(
+            trigger="axis",
+            formatter=JsCode(
+                "function(params){"
+                "var tip=params[0].axisValueLabel;"
+                "params.forEach(function(p){"
+                "if(p.value[1])tip+='<br/>'+p.marker+p.seriesName+': '+p.value[1];"
+                "});"
+                "return tip;}"
+            )
+        ),
         legend_opts=opts.LegendOpts(
             type_="scroll",
             selected_mode="multiple"
