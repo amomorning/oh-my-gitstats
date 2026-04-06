@@ -155,9 +155,19 @@ gitstats sync ./data --check
 
 ### Windows (PowerShell)
 
+Set for current session:
+
 ```powershell
 $env:GITHUB_TOKEN="ghp_your_token_here"
 gitstats sync ./data --check
+```
+
+Set permanently via GUI: **Settings** → **System** → **About** → **Advanced system settings** → **Environment Variables** → User variables → **New**
+
+Verify the value:
+
+```powershell
+echo $env:GITHUB_TOKEN
 ```
 
 ### How to get a token

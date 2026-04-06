@@ -155,9 +155,19 @@ gitstats sync ./data --check
 
 ### Windows (PowerShell)
 
+当前会话设置：
+
 ```powershell
 $env:GITHUB_TOKEN="ghp_your_token_here"
 gitstats sync ./data --check
+```
+
+通过 GUI 永久设置：**设置** → **系统** → **关于** → **高级系统设置** → **环境变量** → 用户变量 → **新建**
+
+验证是否设置成功：
+
+```powershell
+echo $env:GITHUB_TOKEN
 ```
 
 ### 如何获取 Token
