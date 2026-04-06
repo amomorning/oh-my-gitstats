@@ -2,11 +2,13 @@
 
 import json
 import os
+import re
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Dict, Any
 
+import requests
 from git import Repo, Commit
 
 
@@ -64,6 +66,7 @@ def extract_commit_data(repo_path: Path) -> Dict[str, Any]:
         "repo_path": str(repo_path.absolute()),
         "last_commit_hash": _read_head_hash(repo_path),
         "sync_status": _get_sync_status(repo_path),
+        "is_archived": None,
         "commits": commits
     }
 
@@ -130,6 +133,71 @@ def _read_head_hash(repo_path: Path) -> str | None:
                     return line.split()[0]
         return None
     return head  # detached HEAD
+
+
+def _extract_github_owner_repo(repo_path: Path) -> str | None:
+    """Extract 'owner/repo' from the origin remote URL of a git repository.
+
+    Supports:
+      - https://github.com/owner/repo.git
+      - git@github.com:owner/repo.git
+      - ssh://git@github.com/owner/repo.git
+
+    Returns None if no origin remote, not a GitHub remote, or URL is malformed.
+    """
+    try:
+        repo = Repo(repo_path)
+        url = repo.remote("origin").url.strip()
+    except Exception:
+        return None
+
+    patterns = [
+        r"(?:https?://)?github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$",
+        r"git@github\.com:([^/]+/[^/]+?)(?:\.git)?$",
+    ]
+    for pattern in patterns:
+        m = re.match(pattern, url)
+        if m:
+            return m.group(1)
+    return None
+
+
+def _check_github_archived(owner_repo: str) -> bool | None:
+    """Check if a GitHub repository is archived via the REST API.
+
+    Args:
+        owner_repo: GitHub repository in 'owner/repo' format.
+
+    Returns:
+        True if archived, False if not archived, None if the check failed.
+    """
+    headers = {"User-Agent": "oh-my-gitstats"}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    try:
+        resp = requests.get(
+            f"https://api.github.com/repos/{owner_repo}",
+            headers=headers,
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("archived", False)
+        return None
+    except requests.RequestException:
+        return None
+
+
+def _check_repo_archived(repo_path: Path) -> bool | None:
+    """Check if a local git repo's GitHub mirror is archived.
+
+    Returns True/False for the archived state, or None if it cannot be determined.
+    """
+    owner_repo = _extract_github_owner_repo(repo_path)
+    if owner_repo is None:
+        return None
+    return _check_github_archived(owner_repo)
 
 
 def _parse_commit(commit: Commit) -> Dict[str, Any]:
@@ -206,16 +274,18 @@ def sync_repo_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "repo_path": data["repo_path"],
         "last_commit_hash": _read_head_hash(repo_path),
         "sync_status": _get_sync_status(repo_path),
+        "is_archived": data.get("is_archived"),
         "commits": all_commits,
     }
 
 
-def sync_repos(data_dir: str, verbose: bool = True) -> List[Path]:
+def sync_repos(data_dir: str, verbose: bool = True, check: bool = False) -> List[Path]:
     """Incrementally update existing JSON files with new commits.
 
     Args:
         data_dir: Directory containing existing JSON files.
         verbose: Whether to print progress messages.
+        check: Whether to check GitHub archive status for each repo.
 
     Returns:
         List of paths to updated JSON files.
@@ -246,17 +316,36 @@ def sync_repos(data_dir: str, verbose: bool = True) -> List[Path]:
         if verbose:
             print(f"Syncing: {data['repo_name']}")
 
+        # Check GitHub archive status if requested
+        if check:
+            archived = _check_repo_archived(repo_path)
+            data["is_archived"] = archived
+            if verbose:
+                status_map = {True: "archived", False: "active", None: "unknown"}
+                print(f"  GitHub status: {status_map.get(archived, 'unknown')}")
+
         # Fast skip: compare HEAD hash without opening GitPython
         stored_hash = data.get("last_commit_hash")
         current_hash = _read_head_hash(repo_path)
-        if stored_hash and current_hash and stored_hash == current_hash:
-            if verbose:
-                print("  Skipped (no changes)")
+        has_new_commits = not (stored_hash and current_hash and stored_hash == current_hash)
+
+        if not has_new_commits:
+            # Still save if archive status was updated
+            if check:
+                filepath = save_repo_data(data, data_path)
+                saved_files.append(filepath)
+                if verbose:
+                    print("  Skipped (no new commits)")
+            else:
+                if verbose:
+                    print("  Skipped (no changes)")
             continue
 
         old_count = len(data.get("commits", []))
         try:
             updated = sync_repo_data(data)
+            if check:
+                updated["is_archived"] = data.get("is_archived")
             filepath = save_repo_data(updated, data_path)
             saved_files.append(filepath)
 

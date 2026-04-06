@@ -54,14 +54,22 @@ def collect(path: str, output: str, quiet: bool):
     is_flag=True,
     help="Suppress output messages",
 )
-def sync(data_dir: str, quiet: bool):
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check GitHub archive status for each repository",
+)
+def sync(data_dir: str, quiet: bool, check: bool):
     """Incrementally update JSON files in DATA_DIR with new commits.
 
     Only fetches commits newer than the latest commit in each existing
     JSON file, making it much faster than a full collect.
+
+    Use --check to also query the GitHub API and record whether each
+    repository is archived.
     """
     verbose = not quiet
-    sync_repos(data_dir, verbose=verbose)
+    sync_repos(data_dir, verbose=verbose, check=check)
 
 
 @main.command()

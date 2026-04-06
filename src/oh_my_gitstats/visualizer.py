@@ -41,6 +41,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
             "name": repo["repo_name"],
             "path": repo.get("repo_path", ""),
             "sync_status": repo.get("sync_status", ""),
+            "is_archived": repo.get("is_archived"),
         }
         for repo in all_data
     ]
@@ -61,6 +62,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
             "path": rewrite_path(repo["path"]),
             "sync_emoji": info.get("emoji", ""),
             "sync_label": info.get("label", ""),
+            "is_archived": repo.get("is_archived"),
         })
 
     # Render HTML

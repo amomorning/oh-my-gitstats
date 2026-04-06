@@ -73,6 +73,7 @@ gitstats sync ./data
 | 选项 | 说明 |
 |------|------|
 | `-q, --quiet` | 静默模式，不输出提示信息 |
+| `--check` | 检查 GitHub 仓库归档状态 |
 
 ### 3️⃣ 生成可视化
 
@@ -98,7 +99,7 @@ gitstats visualize ./data --output ./output/stats.html
 
 2. **🗓️ 聚合热力图** - 所有仓库的汇总活跃度，支持年份选择（全部年份 / 指定年份）。
 
-3. **📊 独立热力图** - 每个仓库的日历视图，网格布局排列，显示同步状态指示器和"打开文件夹"按钮（在 VS Code 中打开）。
+3. **📊 独立热力图** - 每个仓库的日历视图，网格布局排列，显示同步状态指示器和"Continue" / "Archived"按钮（在 VS Code 中打开）。
 
 ![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
@@ -113,6 +114,7 @@ gitstats visualize ./data --output ./output/stats.html
   "repo_path": "/absolute/path/to/my-project",
   "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
+  "is_archived": false,
   "commits": [
     {
       "timestamp": "2024-01-15T10:30:00",
@@ -136,6 +138,41 @@ gitstats visualize ./data --output ./output/stats.html
 | 🔒 `local_only_clean` | 无远程仓库，本地干净 |
 | 🔧 `local_only_dirty` | 无远程仓库，本地有未提交更改 |
 
+`is_archived` 字段表示仓库是否已在 GitHub 上归档。通过 `sync --check` 设置。取值：`true`（已归档）、`false`（活跃）、`null`（未检查或检查失败）。已归档的仓库在可视化中显示为灰色的"Archived"按钮。
+
+## 🔑 GitHub Token（可选）
+
+`sync --check` 通过 GitHub API 检查归档状态。不带认证时，只能检查**公开仓库**（速率限制：60 次/小时）。
+
+要检查**私有仓库**，请设置 `GITHUB_TOKEN` 环境变量：
+
+### Linux / macOS
+
+```bash
+export GITHUB_TOKEN=ghp_your_token_here
+gitstats sync ./data --check
+```
+
+### Windows (PowerShell)
+
+```powershell
+$env:GITHUB_TOKEN="ghp_your_token_here"
+gitstats sync ./data --check
+```
+
+### 如何获取 Token
+
+1. 前往 **GitHub** → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+2. 点击 **Generate new token (classic)**
+3. 填写名称（如 `oh-my-gitstats`）
+4. 在 **Select scopes** 下，无需额外权限（默认可访问公开仓库）
+5. 要访问**私有仓库**，勾选 `repo` 权限
+6. 点击 **Generate token** 并复制值（以 `ghp_` 开头）
+
+> **注意：** 请使用 **Tokens (classic)**，而非 Fine-grained tokens。
+
+> 使用 Token 后，速率限制提升至 5,000 次/小时。
+
 ## 🔧 依赖
 
 - Python 3.9+
@@ -143,3 +180,4 @@ gitstats visualize ./data --output ./output/stats.html
 - gitpython
 - pyecharts
 - jinja2
+- requests

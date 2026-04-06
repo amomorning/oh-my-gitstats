@@ -89,6 +89,13 @@
         .open-folder-btn:hover {
             background: #357abd;
         }
+        .open-folder-btn.archived {
+            background: #999;
+            cursor: default;
+        }
+        .open-folder-btn.archived:hover {
+            background: #999;
+        }
         .status-badge {
             font-size: 16px;
             cursor: help;
@@ -174,9 +181,15 @@
                         {% if item.sync_emoji %}
                         <span class="status-badge" title="{{ item.sync_label }}">{{ item.sync_emoji }}</span>
                         {% endif %}
-                        <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
-                            📂 Open Folder
+                        {% if item.is_archived == true %}
+                        <button class="open-folder-btn archived" disabled>
+                            &#128450; Archived
                         </button>
+                        {% else %}
+                        <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
+                            &#128194; Continue
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="repo-path">{{ item.path }}</div>

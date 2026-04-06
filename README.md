@@ -73,6 +73,7 @@ gitstats sync ./data
 | Option | Description |
 |--------|-------------|
 | `-q, --quiet` | Suppress output messages |
+| `--check` | Check GitHub archive status for each repository |
 
 ### 3️⃣ Generate Visualization
 
@@ -98,7 +99,7 @@ The generated HTML contains:
 
 2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
 
-3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and an "Open Folder" button to open in VS Code.
+3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
 
 ![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
@@ -113,6 +114,7 @@ Each repository generates a JSON file:
   "repo_path": "/absolute/path/to/my-project",
   "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
+  "is_archived": false,
   "commits": [
     {
       "timestamp": "2024-01-15T10:30:00",
@@ -136,6 +138,41 @@ The `sync_status` field indicates the repository's sync state with its remote:
 | 🔒 `local_only_clean` | No remote configured, local is clean |
 | 🔧 `local_only_dirty` | No remote configured, local has uncommitted changes |
 
+The `is_archived` field indicates whether the repository is archived on GitHub. Set by `sync --check`. Values: `true` (archived), `false` (active), `null` (not checked or check failed). Archived repos show a grayed-out "Archived" button in the visualization.
+
+## 🔑 GitHub Token (Optional)
+
+`sync --check` queries the GitHub API to check archive status. Without authentication, only **public repositories** can be checked (rate limit: 60 requests/hour).
+
+To check **private repositories**, set the `GITHUB_TOKEN` environment variable:
+
+### Linux / macOS
+
+```bash
+export GITHUB_TOKEN=ghp_your_token_here
+gitstats sync ./data --check
+```
+
+### Windows (PowerShell)
+
+```powershell
+$env:GITHUB_TOKEN="ghp_your_token_here"
+gitstats sync ./data --check
+```
+
+### How to get a token
+
+1. Go to **GitHub** → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+2. Click **Generate new token (classic)**
+3. Give it a name (e.g. `oh-my-gitstats`)
+4. Under **Select scopes**, no additional scopes are needed (public repo access is default)
+5. To access **private repositories**, check the `repo` scope
+6. Click **Generate token** and copy the value (starts with `ghp_`)
+
+> **Note:** Use **Tokens (classic)**, not Fine-grained tokens.
+
+> With a token, the rate limit increases to 5,000 requests/hour.
+
 ## 🔧 Requirements
 
 - Python 3.9+
@@ -143,3 +180,4 @@ The `sync_status` field indicates the repository's sync state with its remote:
 - gitpython
 - pyecharts
 - jinja2
+- requests

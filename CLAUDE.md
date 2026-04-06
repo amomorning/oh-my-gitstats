@@ -47,7 +47,7 @@ Entry point defined in `pyproject.toml`: `gitstats = "oh_my_gitstats.cli:main"`
 Click group with three subcommands:
 
 - `collect` — scans directory recursively for `.git`, extracts commits, saves JSON. Options: `--output` (default `./data`), `--quiet` (suppress output).
-- `sync` — incrementally updates existing JSON files in a data directory. Only fetches commits newer than the latest commit already recorded. Skips repos whose directory no longer exists. Options: `--quiet`.
+- `sync` — incrementally updates existing JSON files in a data directory. Only fetches commits newer than the latest commit already recorded. Skips repos whose directory no longer exists. Options: `--quiet`, `--check` (check GitHub archive status).
 - `visualize` — reads JSON files, generates single HTML with ECharts. Options: `--output` (default `./output/stats.html`). Granularity and metric selection are handled in-browser via JS dropdowns.
 
 ### `collector.py`
@@ -65,7 +65,10 @@ Key functions:
 - `_parse_commit(commit)` → `Dict[str, Any]` — private helper, parses a single GitPython Commit object
 - `save_repo_data(data, output_dir)` → `Path` — writes one JSON per repo
 - `sync_repo_data(data)` → `Dict` — incrementally updates a single repo's data (new commits only, refreshed sync status)
-- `sync_repos(data_dir, verbose=True)` → `List[Path]` — incremental sync entry point; reads existing JSON files, skips repos with unchanged HEAD hash, updates the rest with new commits
+- `sync_repos(data_dir, verbose=True, check=False)` → `List[Path]` — incremental sync entry point; reads existing JSON files, skips repos with unchanged HEAD hash, updates the rest with new commits. When `check=True`, queries GitHub API for archive status.
+- `_extract_github_owner_repo(repo_path)` → `str | None` — extracts `owner/repo` from origin remote URL
+- `_check_github_archived(owner_repo)` → `bool | None` — checks GitHub API for archive status; supports `GITHUB_TOKEN` env var
+- `_check_repo_archived(repo_path)` → `bool | None` — combines the two functions above
 - `collect_all_repos(root_path, output_dir, verbose=True)` → `List[Path]` — full collection entry point
 
 ### `constants.py`
@@ -115,7 +118,7 @@ The generated HTML provides:
 
 1. **Line Chart** — metric dropdown (Lines Changed / Commit Count) + granularity dropdown (Day/Week/Month)
 2. **Aggregate Heatmap** — year selector dropdown (All Years / specific year)
-3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with sync status emoji, year selector and "Open Folder" button (`vscode://file/` URI)
+3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with sync status emoji, year selector and "Continue" / "Archived" button (`vscode://file/` URI)
 
 ## JSON Data Format
 
@@ -127,6 +130,7 @@ Each file in `data/` is named `{repo_name}.json`:
   "repo_path": "/absolute/path/to/my-project",
   "last_commit_hash": "a1b2c3d4...",
   "sync_status": "synced",
+  "is_archived": false,
   "commits": [
     {
       "timestamp": "2024-01-15T10:30:00+08:00",
@@ -139,12 +143,15 @@ Each file in `data/` is named `{repo_name}.json`:
 
 `sync_status` values: `synced` | `local_changes` | `remote_ahead` | `diverged` | `local_only_clean` | `local_only_dirty`
 
+`is_archived` values: `true` | `false` | `null` (not checked or check failed). Set by `sync --check` via GitHub API. Supports `GITHUB_TOKEN` env var for private repos.
+
 ## Dependencies
 
 - **click** (≥8.0) — CLI framework
 - **gitpython** (≥3.1) — git repository parsing
 - **pyecharts** (≥2.0) — ECharts chart generation
 - **jinja2** (≥3.0) — HTML templating
+- **requests** (≥2.28) — GitHub API queries for archive status
 
 ## pyecharts Pitfalls
 
