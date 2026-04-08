@@ -91,10 +91,10 @@
         }
         .open-folder-btn.archived {
             background: #999;
-            cursor: default;
+            cursor: pointer;
         }
         .open-folder-btn.archived:hover {
-            background: #999;
+            background: #777;
         }
         .status-badge {
             font-size: 16px;
@@ -182,7 +182,7 @@
                         <span class="status-badge" title="{{ item.sync_label }}">{{ item.sync_emoji }}</span>
                         {% endif %}
                         {% if item.is_archived == true %}
-                        <button class="open-folder-btn archived" disabled>
+                        <button class="open-folder-btn archived" onclick="openFolder('{{ item.path }}')">
                             &#128450; Archived
                         </button>
                         {% else %}

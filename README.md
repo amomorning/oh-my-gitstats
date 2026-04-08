@@ -54,6 +54,7 @@ gitstats collect /path/to/repos --output ./data
 |--------|-------------|
 | `-o, --output` | Directory to save JSON files (default: `./data`) |
 | `-q, --quiet` | Suppress output messages |
+| `--check` | Check GitHub archive status for each repository |
 
 ### 2️⃣ Incremental Sync
 

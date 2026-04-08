@@ -31,14 +31,19 @@ def main():
     is_flag=True,
     help="Suppress output messages",
 )
-def collect(path: str, output: str, quiet: bool):
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check GitHub archive status for each repository",
+)
+def collect(path: str, output: str, quiet: bool, check: bool):
     """Collect commit data from all git repositories under PATH.
 
     Scans the specified directory recursively for git repositories
     and saves commit data to individual JSON files.
     """
     verbose = not quiet
-    saved_files = collect_all_repos(path, output, verbose=verbose)
+    saved_files = collect_all_repos(path, output, verbose=verbose, check=check)
 
     if not verbose:
         print(f"Saved {len(saved_files)} files to {output}")

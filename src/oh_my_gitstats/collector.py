@@ -362,13 +362,14 @@ def sync_repos(data_dir: str, verbose: bool = True, check: bool = False) -> List
     return saved_files
 
 
-def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True) -> List[Path]:
+def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True, check: bool = False) -> List[Path]:
     """Collect commit data from all git repos under root_path.
 
     Args:
         root_path: Root directory to search for git repos.
         output_dir: Directory to save JSON files.
         verbose: Whether to print progress messages.
+        check: Whether to check GitHub archive status for each repo.
 
     Returns:
         List of paths to saved JSON files.
@@ -387,6 +388,12 @@ def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True) -> 
 
         try:
             data = extract_commit_data(repo_path)
+            if check:
+                archived = _check_repo_archived(repo_path)
+                data["is_archived"] = archived
+                if verbose:
+                    status_map = {True: "archived", False: "active", None: "unknown"}
+                    print(f"  GitHub status: {status_map.get(archived, 'unknown')}")
             if data["commits"]:  # Only save if there are commits
                 filepath = save_repo_data(data, output_path)
                 saved_files.append(filepath)

@@ -54,6 +54,7 @@ gitstats collect /path/to/repos --output ./data
 |------|------|
 | `-o, --output` | JSON 文件保存目录（默认 `./data`） |
 | `-q, --quiet` | 静默模式，不输出提示信息 |
+| `--check` | 检查 GitHub 仓库归档状态 |
 
 ### 2️⃣ 增量同步
 
