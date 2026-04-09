@@ -9,10 +9,12 @@ COLORS = [
 ]
 
 SYNC_STATUS_INFO = {
-    "synced":           {"emoji": "\u2705", "label": "Synced with remote"},
-    "local_changes":    {"emoji": "\u270f\ufe0f", "label": "Local changes, remote up-to-date"},
-    "remote_ahead":     {"emoji": "\u2b07\ufe0f", "label": "Remote has new commits"},
-    "diverged":         {"emoji": "\u26a0\ufe0f", "label": "Local changes + remote ahead"},
-    "local_only_clean": {"emoji": "\U0001f512", "label": "No remote, local clean"},
-    "local_only_dirty": {"emoji": "\U0001f527", "label": "No remote, local changes"},
+    "synced":               {"emoji": "\u2705", "label": "Synced with remote"},
+    "local_changes":        {"emoji": "\u270f\ufe0f", "label": "Local changes, remote up-to-date"},
+    "remote_ahead":         {"emoji": "\u2b07\ufe0f", "label": "Remote has new commits"},
+    "diverged":             {"emoji": "\u26a0\ufe0f", "label": "Local changes + remote ahead"},
+    "local_only_clean":     {"emoji": "\U0001f512", "label": "No remote, local clean"},
+    "local_only_dirty":     {"emoji": "\U0001f527", "label": "No remote, local changes"},
+    "network_error_clean":  {"emoji": "\u26a0\ufe0f", "label": "Network error, local clean"},
+    "network_error_dirty":  {"emoji": "\u26a0\ufe0f", "label": "Network error, local changes"},
 }

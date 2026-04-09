@@ -21,6 +21,8 @@ class SyncStatus(str, Enum):
     DIVERGED = "diverged"
     LOCAL_ONLY_CLEAN = "local_only_clean"
     LOCAL_ONLY_DIRTY = "local_only_dirty"
+    NETWORK_ERROR_CLEAN = "network_error_clean"
+    NETWORK_ERROR_DIRTY = "network_error_dirty"
 
 
 def find_git_repos(root_path: str) -> List[Path]:
@@ -85,7 +87,19 @@ def _get_sync_status(repo_path: Path) -> SyncStatus:
 
     try:
         origin = repo.remote("origin")
+    except Exception:
+        # No remote named "origin" configured
+        return SyncStatus.LOCAL_ONLY_DIRTY if is_dirty else SyncStatus.LOCAL_ONLY_CLEAN
+
+    try:
         origin.fetch()
+    except Exception as e:
+        # Remote exists but fetch failed (network error, auth failure, etc.)
+        print(f"  Warning: could not fetch remote for {repo_path.name}: {e}")
+        return SyncStatus.NETWORK_ERROR_DIRTY if is_dirty else SyncStatus.NETWORK_ERROR_CLEAN
+
+    # Fetch succeeded -- compare local and remote
+    try:
         active_branch = repo.active_branch
         tracking = active_branch.tracking_branch()
         if tracking:
@@ -94,7 +108,8 @@ def _get_sync_status(repo_path: Path) -> SyncStatus:
         else:
             remote_ahead = False
     except Exception:
-        return SyncStatus.LOCAL_ONLY_DIRTY if is_dirty else SyncStatus.LOCAL_ONLY_CLEAN
+        # Detached HEAD or other edge case after successful fetch
+        return SyncStatus.LOCAL_CHANGES if is_dirty else SyncStatus.SYNCED
 
     if is_dirty and remote_ahead:
         return SyncStatus.DIVERGED
@@ -329,32 +344,41 @@ def sync_repos(data_dir: str, verbose: bool = True, check: bool = False) -> List
         current_hash = _read_head_hash(repo_path)
         has_new_commits = not (stored_hash and current_hash and stored_hash == current_hash)
 
-        if not has_new_commits:
-            # Still save if archive status was updated
-            if check:
-                filepath = save_repo_data(data, data_path)
-                saved_files.append(filepath)
-                if verbose:
-                    print("  Skipped (no new commits)")
-            else:
-                if verbose:
-                    print("  Skipped (no changes)")
+        # Always refresh sync_status to recover from stale network errors
+        new_sync_status = _get_sync_status(repo_path)
+        sync_changed = data.get("sync_status") != new_sync_status.value
+
+        if not has_new_commits and not sync_changed and not check:
+            if verbose:
+                print("  Skipped (no changes)")
             continue
 
-        old_count = len(data.get("commits", []))
-        try:
-            updated = sync_repo_data(data)
-            if check:
-                updated["is_archived"] = data.get("is_archived")
+        if has_new_commits:
+            old_count = len(data.get("commits", []))
+            try:
+                updated = sync_repo_data(data)
+                if check:
+                    updated["is_archived"] = data.get("is_archived")
+                filepath = save_repo_data(updated, data_path)
+                saved_files.append(filepath)
+
+                new_count = len(updated["commits"]) - old_count
+                if verbose:
+                    print(f"  +{new_count} new commits")
+            except Exception as e:
+                if verbose:
+                    print(f"  Error: {e}")
+        else:
+            # No new commits but status or archive changed
+            updated = dict(data)
+            updated["sync_status"] = new_sync_status.value
             filepath = save_repo_data(updated, data_path)
             saved_files.append(filepath)
-
-            new_count = len(updated["commits"]) - old_count
             if verbose:
-                print(f"  +{new_count} new commits")
-        except Exception as e:
-            if verbose:
-                print(f"  Error: {e}")
+                if sync_changed:
+                    print(f"  Updated sync status: {new_sync_status.value}")
+                else:
+                    print("  Skipped (no new commits)")
 
     if verbose:
         print(f"\nSynced {len(saved_files)} repositories")

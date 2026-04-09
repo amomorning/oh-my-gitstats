@@ -54,7 +54,7 @@ gitstats collect /path/to/repos --output ./data
 |--------|-------------|
 | `-o, --output` | Directory to save JSON files (default: `./data`) |
 | `-q, --quiet` | Suppress output messages |
-| `--check` | Check GitHub archive status for each repository |
+| `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
 
 ### 2️⃣ Incremental Sync
 
@@ -74,7 +74,7 @@ gitstats sync ./data
 | Option | Description |
 |--------|-------------|
 | `-q, --quiet` | Suppress output messages |
-| `--check` | Check GitHub archive status for each repository |
+| `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
 
 ### 3️⃣ Generate Visualization
 
@@ -92,58 +92,11 @@ gitstats visualize ./data --output ./output/stats.html
 
 Granularity and metric can be switched dynamically in the generated HTML — no need to regenerate.
 
-## 📁 Output
-
-The generated HTML contains:
-
-1. **📈 Line Chart** - Changes over time with metric selector (Lines Changed / Commit Count) and granularity selector (Day/Week/Month). Click legend to toggle projects.
-
-2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
-
-3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
-
-![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
-
-
-## 📋 JSON Format
-
-Each repository generates a JSON file:
-
-```json
-{
-  "repo_name": "my-project",
-  "repo_path": "/absolute/path/to/my-project",
-  "last_commit_hash": "a1b2c3d4...",
-  "sync_status": "synced",
-  "is_archived": false,
-  "commits": [
-    {
-      "timestamp": "2024-01-15T10:30:00",
-      "additions": 45,
-      "deletions": 12
-    }
-  ]
-}
-```
-
-The `last_commit_hash` field stores the HEAD commit hash at collection time. During `sync`, repositories with a matching hash are skipped instantly — no git operations needed.
-
-The `sync_status` field indicates the repository's sync state with its remote:
-
-| Status | Description |
-| ------ | ----------- |
-| ✅ `synced` | In sync with remote |
-| ✏️ `local_changes` | Local has uncommitted changes, remote is up-to-date |
-| ⬇️ `remote_ahead` | Local is clean, but remote has new commits |
-| ⚠️ `diverged` | Local has uncommitted changes and remote has new commits |
-| 🔒 `local_only_clean` | No remote configured, local is clean |
-| 🔧 `local_only_dirty` | No remote configured, local has uncommitted changes |
-
-The `is_archived` field indicates whether the repository is archived on GitHub. Set by `sync --check`. Values: `true` (archived), `false` (active), `null` (not checked or check failed). Archived repos show a grayed-out "Archived" button in the visualization.
-
 ## 🔑 GitHub Token (Optional)
 
-`sync --check` queries the GitHub API to check archive status. Without authentication, only **public repositories** can be checked (rate limit: 60 requests/hour).
+`--check` queries the GitHub API to check archive status. Without authentication, only **public repositories** can be checked (rate limit: 60 requests/hour).
+
+> If `GITHUB_TOKEN` is not set, a warning will be printed when using `--check`.
 
 To check **private repositories**, set the `GITHUB_TOKEN` environment variable:
 
@@ -180,9 +133,57 @@ echo $env:GITHUB_TOKEN
 5. To access **private repositories**, check the `repo` scope
 6. Click **Generate token** and copy the value (starts with `ghp_`)
 
-> **Note:** Use **Tokens (classic)**, not Fine-grained tokens.
+> **Note:** Use **Tokens (classic)**, not Fine-grained tokens. With a token, the rate limit increases to 5,000 requests/hour.
 
-> With a token, the rate limit increases to 5,000 requests/hour.
+## 📁 Output
+
+The generated HTML contains:
+
+1. **📈 Line Chart** - Changes over time with metric selector (Lines Changed / Commit Count) and granularity selector (Day/Week/Month). Click legend to toggle projects.
+
+2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
+
+3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
+
+![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
+
+## 📋 JSON Format
+
+Each repository generates a JSON file:
+
+```json
+{
+  "repo_name": "my-project",
+  "repo_path": "/absolute/path/to/my-project",
+  "last_commit_hash": "a1b2c3d4...",
+  "sync_status": "synced",
+  "is_archived": false,
+  "commits": [
+    {
+      "timestamp": "2024-01-15T10:30:00",
+      "additions": 45,
+      "deletions": 12
+    }
+  ]
+}
+```
+
+The `last_commit_hash` field stores the HEAD commit hash at collection time. During `sync`, repositories with a matching hash are skipped instantly — no git operations needed.
+
+The `sync_status` field indicates the repository's sync state with its remote:
+
+| Status | Description |
+| ------ | ----------- |
+| ✅ `synced` | In sync with remote |
+| ✏️ `local_changes` | Local has uncommitted changes, remote is up-to-date |
+| ⬇️ `remote_ahead` | Local is clean, but remote has new commits |
+| ⚠️ `diverged` | Local has uncommitted changes and remote has new commits |
+| 🔒 `local_only_clean` | No remote configured, local is clean |
+| 🔧 `local_only_dirty` | No remote configured, local has uncommitted changes |
+| ⚠️ `network_error_clean` | Remote exists but fetch failed, local is clean |
+| ⚠️ `network_error_dirty` | Remote exists but fetch failed, local has uncommitted changes |
+
+The `is_archived` field indicates whether the repository is archived on GitHub. Set by `--check`. Values: `true` (archived), `false` (active), `null` (not checked or check failed). Archived repos show a grayed-out "Archived" button in the visualization.
 
 ## 🔧 Requirements
 

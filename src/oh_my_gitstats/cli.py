@@ -1,5 +1,6 @@
 """Command-line interface for oh-my-gitstats."""
 
+import os
 from pathlib import Path
 
 import click
@@ -8,14 +9,34 @@ from .collector import collect_all_repos, sync_repos
 from .visualizer import generate_html
 
 
-@click.group()
+def _warn_missing_github_token():
+    """Print a warning if GITHUB_TOKEN is not set."""
+    if not os.environ.get("GITHUB_TOKEN"):
+        print("Warning: GITHUB_TOKEN is not set. "
+              "Private repos cannot be checked and rate limits are lower. "
+              "See README for instructions.")
+
+
+@click.group(epilog="""\
+Common workflows: \n
+  1. Collect:   gitstats collect ~/projects -o ./data \n
+  2. Sync:      gitstats sync ./data --check \n
+  3. Visualize: gitstats visualize ./data \n
+
+Use 'gitstats COMMAND --help' for more information on a command.
+""")
 @click.version_option()
 def main():
     """oh-my-gitstats: Git repository commit statistics collector and visualizer."""
     pass
 
 
-@main.command()
+@main.command(epilog="""\
+Examples: \n
+  gitstats collect ~/projects --output ./data \n
+  gitstats collect ~/code -o ./data --check \n
+  gitstats collect ~/repos -q \n
+""")
 @click.argument(
     "path",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
@@ -24,17 +45,18 @@ def main():
     "-o", "--output",
     default="./data",
     type=click.Path(file_okay=False, dir_okay=True),
-    help="Directory to save JSON files (default: ./data)",
+    help="Directory to save JSON files.",
+    show_default=True,
 )
 @click.option(
     "-q", "--quiet",
     is_flag=True,
-    help="Suppress output messages",
+    help="Suppress output messages.",
 )
 @click.option(
     "--check",
     is_flag=True,
-    help="Check GitHub archive status for each repository",
+    help="Check GitHub archive status (requires network; set GITHUB_TOKEN for private repos).",
 )
 def collect(path: str, output: str, quiet: bool, check: bool):
     """Collect commit data from all git repositories under PATH.
@@ -43,13 +65,20 @@ def collect(path: str, output: str, quiet: bool, check: bool):
     and saves commit data to individual JSON files.
     """
     verbose = not quiet
+    if check:
+        _warn_missing_github_token()
     saved_files = collect_all_repos(path, output, verbose=verbose, check=check)
 
     if not verbose:
         print(f"Saved {len(saved_files)} files to {output}")
 
 
-@main.command()
+@main.command(epilog="""\
+Examples: \n
+  gitstats sync ./data \n
+  gitstats sync ./data --check \n
+  gitstats sync ./data -q \n
+""")
 @click.argument(
     "data_dir",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
@@ -57,12 +86,12 @@ def collect(path: str, output: str, quiet: bool, check: bool):
 @click.option(
     "-q", "--quiet",
     is_flag=True,
-    help="Suppress output messages",
+    help="Suppress output messages.",
 )
 @click.option(
     "--check",
     is_flag=True,
-    help="Check GitHub archive status for each repository",
+    help="Check GitHub archive status (requires network; set GITHUB_TOKEN for private repos).",
 )
 def sync(data_dir: str, quiet: bool, check: bool):
     """Incrementally update JSON files in DATA_DIR with new commits.
@@ -74,10 +103,16 @@ def sync(data_dir: str, quiet: bool, check: bool):
     repository is archived.
     """
     verbose = not quiet
+    if check:
+        _warn_missing_github_token()
     sync_repos(data_dir, verbose=verbose, check=check)
 
 
-@main.command()
+@main.command(epilog="""\
+Examples: \n
+  gitstats visualize ./data \n
+  gitstats visualize ./data -o ./report.html \n
+""")
 @click.argument(
     "json_dir",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
@@ -86,7 +121,8 @@ def sync(data_dir: str, quiet: bool, check: bool):
     "-o", "--output",
     default="./output/stats.html",
     type=click.Path(file_okay=True, dir_okay=False),
-    help="Path to save the HTML file (default: ./output/stats.html)",
+    help="Path to save the HTML file.",
+    show_default=True,
 )
 def visualize(json_dir: str, output: str):
     """Generate HTML visualization from JSON files in JSON_DIR.
