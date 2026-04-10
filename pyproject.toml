@@ -1,6 +1,6 @@
 [project]
 name = "oh-my-gitstats"
-version = "0.2.1"
+version = "0.2.2"
 description = "Git repository commit statistics collector and visualizer"
 readme = "README.md"
 license = "MIT"
