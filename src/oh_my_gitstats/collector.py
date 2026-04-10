@@ -73,11 +73,13 @@ def extract_commit_data(repo_path: Path) -> Dict[str, Any]:
     }
 
 
-def _get_sync_status(repo_path: Path) -> SyncStatus:
+def _get_sync_status(repo_path: Path, fetch: bool = True) -> SyncStatus:
     """Check sync status between local repo and its remote.
 
     Args:
         repo_path: Path to the git repository.
+        fetch: If True, fetch remote before comparing (network request).
+               If False, compare against locally cached remote tracking refs.
 
     Returns:
         SyncStatus enum indicating the sync state.
@@ -91,14 +93,15 @@ def _get_sync_status(repo_path: Path) -> SyncStatus:
         # No remote named "origin" configured
         return SyncStatus.LOCAL_ONLY_DIRTY if is_dirty else SyncStatus.LOCAL_ONLY_CLEAN
 
-    try:
-        origin.fetch()
-    except Exception as e:
-        # Remote exists but fetch failed (network error, auth failure, etc.)
-        print(f"  Warning: could not fetch remote for {repo_path.name}: {e}")
-        return SyncStatus.NETWORK_ERROR_DIRTY if is_dirty else SyncStatus.NETWORK_ERROR_CLEAN
+    if fetch:
+        try:
+            origin.fetch()
+        except Exception as e:
+            # Remote exists but fetch failed (network error, auth failure, etc.)
+            print(f"  Warning: could not fetch remote for {repo_path.name}: {e}")
+            return SyncStatus.NETWORK_ERROR_DIRTY if is_dirty else SyncStatus.NETWORK_ERROR_CLEAN
 
-    # Fetch succeeded -- compare local and remote
+    # Compare local branch against remote tracking refs
     try:
         active_branch = repo.active_branch
         tracking = active_branch.tracking_branch()
@@ -108,7 +111,7 @@ def _get_sync_status(repo_path: Path) -> SyncStatus:
         else:
             remote_ahead = False
     except Exception:
-        # Detached HEAD or other edge case after successful fetch
+        # Detached HEAD or other edge case
         return SyncStatus.LOCAL_CHANGES if is_dirty else SyncStatus.SYNCED
 
     if is_dirty and remote_ahead:
@@ -344,9 +347,11 @@ def sync_repos(data_dir: str, verbose: bool = True, check: bool = False) -> List
         current_hash = _read_head_hash(repo_path)
         has_new_commits = not (stored_hash and current_hash and stored_hash == current_hash)
 
-        # Always refresh sync_status to recover from stale network errors
-        new_sync_status = _get_sync_status(repo_path)
-        sync_changed = data.get("sync_status") != new_sync_status.value
+        # Layered sync_status check: only fetch network for error recovery
+        prev_status = data.get("sync_status", "")
+        needs_fetch = prev_status.startswith("network_error")
+        new_sync_status = _get_sync_status(repo_path, fetch=needs_fetch)
+        sync_changed = prev_status != new_sync_status.value
 
         if not has_new_commits and not sync_changed and not check:
             if verbose:
