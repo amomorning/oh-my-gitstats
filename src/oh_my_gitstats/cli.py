@@ -54,11 +54,16 @@ Examples: \n
     help="Suppress output messages.",
 )
 @click.option(
+    "--skip",
+    is_flag=True,
+    help="Skip repos that already have a JSON file in the output directory.",
+)
+@click.option(
     "--check",
     is_flag=True,
     help="Check GitHub archive status (requires network; set GITHUB_TOKEN for private repos).",
 )
-def collect(path: str, output: str, quiet: bool, check: bool):
+def collect(path: str, output: str, quiet: bool, skip: bool, check: bool):
     """Collect commit data from all git repositories under PATH.
 
     Scans the specified directory recursively for git repositories
@@ -67,7 +72,7 @@ def collect(path: str, output: str, quiet: bool, check: bool):
     verbose = not quiet
     if check:
         _warn_missing_github_token()
-    saved_files = collect_all_repos(path, output, verbose=verbose, check=check)
+    saved_files = collect_all_repos(path, output, verbose=verbose, skip=skip, check=check)
 
     if not verbose:
         print(f"Saved {len(saved_files)} files to {output}")

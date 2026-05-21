@@ -54,6 +54,7 @@ gitstats collect /path/to/repos --output ./data
 |------|------|
 | `-o, --output` | JSON 文件保存目录（默认 `./data`） |
 | `-q, --quiet` | 静默模式，不输出提示信息 |
+| `--skip` | 跳过输出目录中已有 JSON 文件的仓库 |
 | `--check` | 检查 GitHub 仓库归档状态（需要网络；私有仓库需设置 `GITHUB_TOKEN`） |
 
 ### 2️⃣ 增量同步
@@ -63,7 +64,7 @@ gitstats collect /path/to/repos --output ./data
 ```bash
 # 一次性从多个位置收集
 gitstats collect /path/to/work-projects --output ./data
-gitstats collect /path/to/personal-projects --output ./data
+gitstats collect /path/to/personal-projects --output ./data --skip
 
 # 之后一键更新 — 只获取新 commit
 gitstats sync ./data

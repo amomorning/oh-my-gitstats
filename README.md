@@ -54,6 +54,7 @@ gitstats collect /path/to/repos --output ./data
 |--------|-------------|
 | `-o, --output` | Directory to save JSON files (default: `./data`) |
 | `-q, --quiet` | Suppress output messages |
+| `--skip` | Skip repos that already have a JSON file in the output directory |
 | `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
 
 ### 2️⃣ Incremental Sync
@@ -63,7 +64,7 @@ You may collect repos from multiple locations into the same `data` directory. Re
 ```bash
 # Collect from multiple locations (one-time)
 gitstats collect /path/to/work-projects --output ./data
-gitstats collect /path/to/personal-projects --output ./data
+gitstats collect /path/to/personal-projects --output ./data --skip
 
 # Later, update all at once — only new commits
 gitstats sync ./data

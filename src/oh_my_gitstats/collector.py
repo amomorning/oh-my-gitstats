@@ -391,13 +391,14 @@ def sync_repos(data_dir: str, verbose: bool = True, check: bool = False) -> List
     return saved_files
 
 
-def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True, check: bool = False) -> List[Path]:
+def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True, skip: bool = False, check: bool = False) -> List[Path]:
     """Collect commit data from all git repos under root_path.
 
     Args:
         root_path: Root directory to search for git repos.
         output_dir: Directory to save JSON files.
         verbose: Whether to print progress messages.
+        skip: Whether to skip repos that already have a JSON file.
         check: Whether to check GitHub archive status for each repo.
 
     Returns:
@@ -412,6 +413,11 @@ def collect_all_repos(root_path: str, output_dir: str, verbose: bool = True, che
     saved_files = []
 
     for repo_path in repos:
+        if skip and (output_path / f"{repo_path.name}.json").exists():
+            if verbose:
+                print(f"Skipped (exists): {repo_path.name}")
+            continue
+
         if verbose:
             print(f"Processing: {repo_path.name}")
 
