@@ -36,15 +36,17 @@ def generate_html(json_dir: str, output_path: str) -> str:
     heatmap_js_obj, active_repos_js_obj = build_heatmap_js_obj(all_data, date_range, years)
 
     # Get repo info for individual heatmaps
-    repo_info = [
-        {
+    repo_info = []
+    for repo in all_data:
+        commits = repo.get("commits", [])
+        last_ts = commits[-1]["timestamp"] if commits else ""
+        repo_info.append({
             "name": repo["repo_name"],
             "path": repo.get("repo_path", ""),
             "sync_status": repo.get("sync_status", ""),
             "is_archived": repo.get("is_archived"),
-        }
-        for repo in all_data
-    ]
+            "last_commit": last_ts,
+        })
 
     # Load template from file
     template_path = Path(__file__).parent / "template.html"
@@ -63,6 +65,7 @@ def generate_html(json_dir: str, output_path: str) -> str:
             "sync_emoji": info.get("emoji", ""),
             "sync_label": info.get("label", ""),
             "is_archived": repo.get("is_archived"),
+            "last_commit": repo.get("last_commit", ""),
         })
 
     # Render HTML

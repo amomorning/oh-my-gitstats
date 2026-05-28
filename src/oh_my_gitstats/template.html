@@ -166,6 +166,12 @@
                 <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
                 {% endfor %}
             </select>
+            <select class="selector" id="sort-selector" onchange="sortHeatmaps(this.value)">
+                <option value="name-asc">Name A → Z</option>
+                <option value="name-desc">Name Z → A</option>
+                <option value="time-desc" selected>Last commit (newest)</option>
+                <option value="time-asc">Last commit (oldest)</option>
+            </select>
         </div>
         <div class="sync-legend">
             {% for item in sync_legend %}
@@ -174,7 +180,7 @@
         </div>
         <div class="heatmaps-grid">
             {% for item in individual_charts %}
-            <div class="heatmap-card" data-repo-index="{{ loop.index0 }}">
+            <div class="heatmap-card" data-repo-index="{{ loop.index0 }}" data-name="{{ item.name }}" data-last-commit="{{ item.last_commit }}">
                 <div class="repo-header">
                     <span class="repo-name">{{ item.name }}</span>
                     <div style="display:flex;align-items:center;gap:8px;">
@@ -243,6 +249,27 @@
             individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
         }
         filterRepos(currentMetric, currentYear);
+        sortHeatmaps(document.getElementById('sort-selector').value);
+
+        function sortHeatmaps(order) {
+            var grid = document.querySelector('.heatmaps-grid');
+            var cards = Array.from(grid.querySelectorAll('.heatmap-card'));
+            cards.sort(function(a, b) {
+                switch (order) {
+                    case 'name-asc':
+                        return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+                    case 'name-desc':
+                        return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
+                    case 'time-asc':
+                        return (a.getAttribute('data-last-commit') || '').localeCompare(b.getAttribute('data-last-commit') || '');
+                    case 'time-desc':
+                        return (b.getAttribute('data-last-commit') || '').localeCompare(a.getAttribute('data-last-commit') || '');
+                    default:
+                        return 0;
+                }
+            });
+            cards.forEach(function(card) { grid.appendChild(card); });
+        }
 
         function filterRepos(metric, year) {
             var active = activeRepos[metric][year];

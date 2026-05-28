@@ -13,11 +13,12 @@ oh-my-gitstats/
 ├── output/                        # Generated HTML visualizations
 └── src/oh_my_gitstats/
     ├── __init__.py                # Package init, version
-    ├── cli.py                     # Click CLI entry point (collect / sync / visualize)
+    ├── cli.py                     # Click CLI entry point (collect / sync / visualize / auto)
     ├── collector.py               # Git data extraction via GitPython
     ├── constants.py               # Shared constants (metrics, colors, sync status)
     ├── data.py                    # JSON loading, date helpers, aggregation
     ├── charts.py                  # pyecharts chart building + JS object assembly
+    ├── settings.py                # Settings management (~/.gitstats/settings.json)
     ├── template.html              # Jinja2 HTML template for the output page
     └── visualizer.py              # Orchestration: generate_html entry point
 ```
@@ -28,27 +29,57 @@ oh-my-gitstats/
 # Editable install
 pip install -e .
 
+# One-step: collect + sync + visualize + open browser
+gitstats auto
+
 # Collect commit data from all repos under a directory
-gitstats collect /path/to/repos --output ./data
+gitstats collect /path/to/repos
 
 # Incrementally update existing JSON files (only new commits)
-gitstats sync ./data
+gitstats sync
 
 # Generate HTML visualization
-gitstats visualize ./data --output ./output/stats.html
+gitstats visualize
 ```
 
+Default data directory: `~/.gitstats/data`. Default output: `~/.gitstats/stats.html`.
+
 Entry point defined in `pyproject.toml`: `gitstats = "oh_my_gitstats.cli:main"`
+
+## Settings
+
+Configuration file at `~/.gitstats/settings.json` (auto-created on first run):
+
+```json
+{
+  "data_dir": "~/.gitstats/data",
+  "output_html": "~/.gitstats/stats.html",
+  "collect_paths": []
+}
+```
+
+- `data_dir` — where JSON files are stored (default `~/.gitstats/data`)
+- `output_html` — where HTML visualization is generated (default `~/.gitstats/stats.html`)
+- `collect_paths` — list of parent directories for `gitstats auto` to scan
 
 ## Source Files
 
 ### `cli.py`
 
-Click group with three subcommands:
+Click group with four subcommands. Uses a custom `MainGroup` class that calls `init_default_settings()` before each command to ensure `~/.gitstats/settings.json` exists.
 
-- `collect` — scans directory recursively for `.git`, extracts commits, saves JSON. Options: `--output` (default `./data`), `--quiet` (suppress output).
-- `sync` — incrementally updates existing JSON files in a data directory. Only fetches commits newer than the latest commit already recorded. Skips repos whose directory no longer exists. Options: `--quiet`, `--check` (check GitHub archive status).
-- `visualize` — reads JSON files, generates single HTML with ECharts. Options: `--output` (default `./output/stats.html`). Granularity and metric selection are handled in-browser via JS dropdowns.
+- `collect` — scans directory recursively for `.git`, extracts commits, saves JSON. Options: `--output` (default from settings `data_dir`), `--quiet`, `--skip`, `--check`.
+- `sync` — incrementally updates existing JSON files. Optional `data_dir` argument (default from settings `data_dir`). Options: `--quiet`, `--check`.
+- `visualize` — reads JSON files, generates single HTML with ECharts. Optional `json_dir` argument (default from settings `data_dir`). Options: `--output` (default from settings `output_html`).
+- `auto` — one-step: collect (skip mode) → sync → visualize → open browser. Reads `collect_paths` from settings. Options: `--quiet`, `--check`, `--no-open`.
+
+### `settings.py`
+
+Settings management module. Module-level constants: `GITSTATS_DIR`, `SETTINGS_PATH`, `DEFAULT_SETTINGS`.
+
+- `load_settings()` → `dict` — reads `settings.json`, merges with defaults, expands `~` in paths. Returns dict with `Path` objects for `data_dir`/`output_html` and `list[str]` for `collect_paths`.
+- `save_settings(settings)` — writes settings to disk.
+- `init_default_settings()` — creates default `settings.json` if missing.
 
 ### `collector.py`
 
