@@ -1,7 +1,5 @@
 <div align="center">
 
-
-
 # 📊 oh-my-gitstats
 
 [中文](https://github.com/amomorning/oh-my-gitstats/blob/main/README.zh-CN.md) | English
@@ -15,22 +13,21 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 
 ## ✨ Features
 
-- 🔍 **Batch Collection** - Scan multiple git repositories recursively
-- ⚡ **Incremental Sync** - Only fetch new commits since last collection
-- 📈 **Line Charts** - Track changes over time with metric & granularity switching
-- 🗓️ **Calendar Heatmaps** - Visualize commit activity with year-based filtering
-- 🎯 **Aggregated & Individual Views** - See combined or per-repo statistics
-- 📂 **VS Code Integration** - Open repo folders directly from the HTML report
+- 🔍 **Batch Collection** — Scan multiple git repositories recursively
+- ⚡ **Incremental Sync** — Only fetch new commits since last collection
+- 🚀 **One-Step Workflow** — `gitstats auto` does everything in one command
+- 📈 **Line Charts** — Track changes over time with metric & granularity switching
+- 🗓️ **Calendar Heatmaps** — Visualize commit activity with year-based filtering
+- 🎯 **Aggregated & Individual Views** — See combined or per-repo statistics
+- 📂 **VS Code Integration** — Open repo folders directly from the HTML report
 
 ## 🚀 Installation
-
-### From PyPI (Recommended)
 
 ```bash
 pip install oh-my-gitstats
 ```
 
-### From Source (Development)
+Or install from source:
 
 ```bash
 git clone https://github.com/amomorning/oh-my-gitstats.git
@@ -38,60 +35,117 @@ cd oh-my-gitstats
 pip install -e .
 ```
 
-## 📖 Usage
+## ⚡ Quick Start
 
-### 1️⃣ Collect Commit Data
+**First time**, collect from each project directory (paths are auto-recorded in config):
+
+```bash
+cd ~/projects && gitstats collect .
+cd ~/work && gitstats collect .
+```
+
+**After that**, one command does collect → sync → visualize → open browser:
+
+```bash
+gitstats auto
+```
+
+You can also manually edit the config file to add directories:
+
+```bash
+# The config file is auto-created at:
+~/.gitstats/settings.json
+```
+
+```json
+{
+  "collect_paths": [
+    "/home/user/projects",
+    "/home/user/work"
+  ]
+}
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-q, --quiet` | Suppress output messages |
+| `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
+| `--no-open` | Do not open the HTML file in browser after generation |
+
+## 📖 Commands
+
+### `collect` — Collect Commit Data
 
 Scan a directory for git repositories and export to JSON:
 
 ```bash
-gitstats collect /path/to/repos --output ./data
+gitstats collect /path/to/repos
 ```
-
-**Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-o, --output` | Directory to save JSON files (default: `./data`) |
+| `-o, --output` | Directory to save JSON files (default: `~/.gitstats/data`) |
 | `-q, --quiet` | Suppress output messages |
-| `--skip` | Skip repos that already have a JSON file in the output directory |
-| `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
+| `--skip` | Skip repos that already have a JSON file |
+| `--check` | Check GitHub archive status |
 
-### 2️⃣ Incremental Sync
+### `sync` — Incremental Sync
 
-You may collect repos from multiple locations into the same `data` directory. Re-running `collect` on every location is slow — `sync` reads the existing JSON files and only fetches new commits for each repo:
+Update existing JSON files with only new commits — much faster than re-collecting:
 
 ```bash
-# Collect from multiple locations (one-time)
-gitstats collect /path/to/work-projects --output ./data
-gitstats collect /path/to/personal-projects --output ./data --skip
-
-# Later, update all at once — only new commits
-gitstats sync ./data
+gitstats sync
 ```
 
-**Options:**
+| Option       | Description                     |
+|--------------|---------------------------------|
+| `-q, --quiet` | Suppress output messages       |
+| `--check`    | Check GitHub archive status     |
 
-| Option | Description |
-|--------|-------------|
-| `-q, --quiet` | Suppress output messages |
-| `--check` | Check GitHub archive status (requires network; set `GITHUB_TOKEN` for private repos) |
+Typical workflow with multiple directories:
 
-### 3️⃣ Generate Visualization
+```bash
+# One-time: collect from different locations
+gitstats collect /path/to/work-projects
+gitstats collect /path/to/personal-projects --skip
+
+# Later: update all at once
+gitstats sync
+```
+
+### `visualize` — Generate Visualization
 
 Create an interactive HTML file from collected data:
 
 ```bash
-gitstats visualize ./data --output ./output/stats.html
+gitstats visualize
 ```
 
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `-o, --output` | HTML file path (default: `./output/stats.html`) |
+| Option       | Description                                        |
+|--------------|----------------------------------------------------|
+| `-o, --output` | HTML file path (default: `~/.gitstats/stats.html`) |
 
 Granularity and metric can be switched dynamically in the generated HTML — no need to regenerate.
+
+## ⚙️ Configuration
+
+Config file at `~/.gitstats/settings.json` (auto-created on first run):
+
+```json
+{
+  "data_dir": "~/.gitstats/data",
+  "output_html": "~/.gitstats/stats.html",
+  "collect_paths": []
+}
+```
+
+| Field           | Description                                                                      |
+|-----------------|----------------------------------------------------------------------------------|
+| `data_dir`      | Where JSON files are stored                                                      |
+| `output_html`   | Where HTML visualization is generated                                            |
+| `collect_paths` | Directories for `gitstats auto` to scan (auto-populated when you run `collect`)  |
 
 ## 🔑 GitHub Token (Optional)
 
@@ -105,7 +159,7 @@ To check **private repositories**, set the `GITHUB_TOKEN` environment variable:
 
 ```bash
 export GITHUB_TOKEN=ghp_your_token_here
-gitstats sync ./data --check
+gitstats sync --check
 ```
 
 ### Windows (PowerShell)
@@ -114,23 +168,17 @@ Set for current session:
 
 ```powershell
 $env:GITHUB_TOKEN="ghp_your_token_here"
-gitstats sync ./data --check
+gitstats sync --check
 ```
 
-Set permanently via GUI: **Settings** → **System** → **About** → **Advanced system settings** → **Environment Variables** → User variables → **New**
-
-Verify the value:
-
-```powershell
-echo $env:GITHUB_TOKEN
-```
+Set permanently: **Settings** → **System** → **About** → **Advanced system settings** → **Environment Variables** → User variables → **New**
 
 ### How to get a token
 
 1. Go to **GitHub** → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
 2. Click **Generate new token (classic)**
 3. Give it a name (e.g. `oh-my-gitstats`)
-4. Under **Select scopes**, no additional scopes are needed (public repo access is default)
+4. Under **Select scopes**, no additional scopes are needed for public repos
 5. To access **private repositories**, check the `repo` scope
 6. Click **Generate token** and copy the value (starts with `ghp_`)
 
@@ -140,17 +188,17 @@ echo $env:GITHUB_TOKEN
 
 The generated HTML contains:
 
-1. **📈 Line Chart** - Changes over time with metric selector (Lines Changed / Commit Count) and granularity selector (Day/Week/Month). Click legend to toggle projects.
+1. **📈 Line Chart** — Changes over time with metric selector (Lines Changed / Commit Count) and granularity selector (Day/Week/Month). Click legend to toggle projects.
 
-2. **🗓️ Aggregate Heatmap** - Combined activity across all repos with year selector (All Years / specific year).
+2. **🗓️ Aggregate Heatmap** — Combined activity across all repos with year selector (All Years / specific year).
 
-3. **📊 Individual Heatmaps** - Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
+3. **📊 Individual Heatmaps** — Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
 
-![alt text](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
+![Individual Heatmaps](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
 ## 📋 JSON Format
 
-Each repository generates a JSON file:
+Each repository generates a JSON file (`~/.gitstats/data/{repo_name}.json`):
 
 ```json
 {
@@ -169,9 +217,9 @@ Each repository generates a JSON file:
 }
 ```
 
-The `last_commit_hash` field stores the HEAD commit hash at collection time. During `sync`, repositories with a matching hash are skipped instantly — no git operations needed.
+**`last_commit_hash`** — HEAD hash at collection time. During `sync`, repos with a matching hash are skipped instantly.
 
-The `sync_status` field indicates the repository's sync state with its remote:
+**`sync_status`** — Sync state with remote:
 
 | Status | Description |
 | ------ | ----------- |
@@ -184,13 +232,9 @@ The `sync_status` field indicates the repository's sync state with its remote:
 | ⚠️ `network_error_clean` | Remote exists but fetch failed, local is clean |
 | ⚠️ `network_error_dirty` | Remote exists but fetch failed, local has uncommitted changes |
 
-The `is_archived` field indicates whether the repository is archived on GitHub. Set by `--check`. Values: `true` (archived), `false` (active), `null` (not checked or check failed). Archived repos show a grayed-out "Archived" button in the visualization.
+**`is_archived`** — Whether the repo is archived on GitHub (set by `--check`). Values: `true`, `false`, or `null` (not checked). Archived repos show a grayed-out "Archived" button.
 
 ## 🔧 Requirements
 
 - Python 3.9+
-- click
-- gitpython
-- pyecharts
-- jinja2
-- requests
+- click, gitpython, pyecharts, jinja2, requests
