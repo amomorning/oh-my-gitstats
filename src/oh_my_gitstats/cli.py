@@ -1,6 +1,9 @@
 """Command-line interface for oh-my-gitstats."""
 
 import os
+import sys
+import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -17,6 +20,48 @@ def _warn_missing_github_token():
         print("Warning: GITHUB_TOKEN is not set. "
               "Private repos cannot be checked and rate limits are lower. "
               "See README for instructions.")
+
+
+class Spinner:
+    """Simple terminal spinner for non-verbose progress indication."""
+
+    _FRAMES = ("|", "/", "-", "\\")
+    _INTERVAL = 0.1
+
+    def __init__(self, enabled=True):
+        self.enabled = enabled
+        self._thread = None
+        self._stop_event = threading.Event()
+        self._message = ""
+
+    def start(self, message=""):
+        """Start the spinner with a status message."""
+        if not self.enabled:
+            return
+        self._message = message
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        """Stop the spinner and clear the line."""
+        if not self.enabled or self._thread is None:
+            return
+        self._stop_event.set()
+        self._thread.join()
+        self._thread = None
+        clear_len = len(self._message) + 2
+        sys.stdout.write(f"\r{' ' * clear_len}\r")
+        sys.stdout.flush()
+
+    def _spin(self):
+        idx = 0
+        while not self._stop_event.is_set():
+            frame = self._FRAMES[idx % len(self._FRAMES)]
+            sys.stdout.write(f"\r{frame} {self._message}")
+            sys.stdout.flush()
+            idx += 1
+            time.sleep(self._INTERVAL)
 
 
 class MainGroup(click.Group):
@@ -176,13 +221,14 @@ def visualize(json_dir: str, output: str):
 @main.command(epilog="""\
 Examples: \n
   gitstats auto \n
+  gitstats auto --verbose \n
   gitstats auto --check \n
   gitstats auto --no-open \n
 """)
 @click.option(
-    "-q", "--quiet",
+    "-v", "--verbose",
     is_flag=True,
-    help="Suppress output messages.",
+    help="Show detailed output for each step (default: spinner only).",
 )
 @click.option(
     "--check",
@@ -194,17 +240,18 @@ Examples: \n
     is_flag=True,
     help="Do not open the HTML file in browser after generation.",
 )
-def auto(quiet: bool, check: bool, no_open: bool):
+def auto(verbose: bool, check: bool, no_open: bool):
     """Run collect, sync, and visualize in one step.
 
     Reads collect_paths from ~/.gitstats/settings.json and processes
     each directory, then syncs and generates the HTML visualization.
+
+    By default shows a compact spinner. Use --verbose for detailed output.
     """
     settings = load_settings()
     collect_paths = settings["collect_paths"]
     data_dir = str(settings["data_dir"])
     output_html = str(settings["output_html"])
-    verbose = not quiet
 
     if check:
         _warn_missing_github_token()
@@ -215,8 +262,11 @@ def auto(quiet: bool, check: bool, no_open: bool):
             f"Edit {SETTINGS_PATH} to add directories containing git repos."
         )
 
+    spinner = Spinner(enabled=not verbose)
+
     # Step 1: Collect from each configured path (skip existing)
     total_collected = 0
+    spinner.start("Collecting repositories...")
     for path in collect_paths:
         if not Path(path).is_dir():
             if verbose:
@@ -226,6 +276,7 @@ def auto(quiet: bool, check: bool, no_open: bool):
             print(f"Collecting from: {path}")
         files = collect_all_repos(path, data_dir, verbose=verbose, skip=True, check=check)
         total_collected += len(files)
+    spinner.stop()
 
     if verbose:
         print(f"\nCollected {total_collected} repos total")
@@ -234,16 +285,21 @@ def auto(quiet: bool, check: bool, no_open: bool):
     if verbose:
         print("\nSyncing...")
     Path(data_dir).mkdir(parents=True, exist_ok=True)
+    spinner.start("Syncing repositories...")
     sync_repos(data_dir, verbose=verbose, check=check)
+    spinner.stop()
 
     # Step 3: Visualize
     if verbose:
         print("\nGenerating visualization...")
+    spinner.start("Generating visualization...")
     try:
         result_path = generate_html(data_dir, output_html)
-        print(f"Generated: {result_path}")
     except ValueError as e:
+        spinner.stop()
         raise click.ClickException(str(e))
+    spinner.stop()
+    print(f"Generated: {result_path}")
 
     # Step 4: Open in browser
     if not no_open:
