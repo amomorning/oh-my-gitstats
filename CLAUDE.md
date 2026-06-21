@@ -108,8 +108,11 @@ Module-level constants:
 
 - `METRICS = ("changes", "commits")` — supported metric types
 - `GRANULARITIES = ("day", "week", "month")` — supported time granularities
-- `COLORS` — list of 10 hex color strings for chart series
-- `SYNC_STATUS_INFO` — dict mapping sync status strings to `{emoji, label}` dicts
+- `COLORS` — list of 10 hex color strings for line chart series (bright Swiss-restrained palette: red / blue / green / amber / purple / cyan / pink / lime / indigo / orange; no black so all series stay distinct on white background)
+- `HEATMAP_COLORS` — list of 5 hex strings forming the calendar heatmap gradient (white → light green → deep green, GitHub-style)
+- `SIGNAL_GREEN` / `SIGNAL_YELLOW` / `SIGNAL_RED` / `SIGNAL_GRAY` — traffic-light colors used by Local/Remote indicators
+- `SYNC_STATUS_INFO` — dict mapping each sync status string to `{local: {color, label}, remote: {color, label}, label}`. The single stored `sync_status` enum is decomposed into two independent Local + Remote signal indicators at render time. JSON data format is unchanged.
+- `SYNC_LEGEND` — ordered list of `{kind, color, label}` items (kind is `"Local"` or `"Remote"`) used to render the grouped legend in the HTML
 
 ### `data.py`
 
@@ -123,33 +126,53 @@ Pure data manipulation functions (no chart library dependency):
 
 ### `charts.py`
 
-pyecharts chart building and JS object assembly:
+pyecharts chart building and JS object assembly. Cell size is forced to a square `[N, N]` for all Calendar heatmaps to keep day cells perfectly square regardless of container width.
 
-- `build_line_opts(all_data, granularity, metric)` → JSON string — builds Line chart options
+- `build_line_opts(all_data, granularity, metric, single_repo=None)` → JSON string — builds Line chart options. When `single_repo` is provided, builds a one-series chart for that repo only (used by the per-repo modal).
 - `build_agg_heatmap_opts(all_data, date_range, metric)` → JSON string — builds aggregate Calendar heatmap options
-- `build_ind_heatmap_opts(all_data, date_range, metric)` → `List[str]` — builds individual Calendar heatmap options per repo
+- `build_ind_heatmap_opts(all_data, date_range, metric, cell_size=10, pos_left="30px", pos_right="10px")` → `List[str]` — builds individual Calendar heatmap options per repo. Smaller `cell_size` for the grid cards, larger for the modal view.
+- `build_single_repo_heatmap_opts(repo, date_range, metric)` → JSON string — wraps `build_ind_heatmap_opts` with `cell_size=16` and wider side padding for the modal
 - `build_line_js_obj(all_data)` → JS object string — pre-computes all metric×granularity combinations (6 charts) as embedded JS
-- `build_heatmap_js_obj(all_data, date_range, years)` → JS object string — pre-computes all metric×year-range combinations as embedded JS
+- `build_heatmap_js_obj(all_data, date_range, years)` → tuple of JS object strings — pre-computes all metric×year-range combinations as embedded JS, plus the `active_repos` index lookup
+- `build_single_repo_line_js_obj(all_data)` → JS object string — pre-computes per-repo line chart options for every `repo_index × metric × granularity` combination, used by the detail modal
+- `build_single_repo_heatmap_js_obj(all_data, date_range, years)` → JS object string — pre-computes per-repo large heatmap options for every `repo_index × metric × year` combination, used by the detail modal
 
 ### `template.html`
 
-Jinja2 HTML template loaded at runtime by `visualizer.py`. Contains CSS styles, HTML structure with three card sections (Line Chart, Aggregate Heatmap, Individual Heatmaps), and client-side JavaScript for chart initialization and interactive controls.
+Jinja2 HTML template loaded at runtime by `visualizer.py`. Rendered with **Swiss International Style** design: pure white background, Inter/Helvetica font stack, strict 12-column grid with generous margins, horizontal black rules instead of shadows, uppercase labels with letter-spacing, no rounded corners. Icons use MDI (Material Design Icons) loaded from BootCDN (China-friendly CDN).
+
+Sections and client-side JavaScript:
+
+1. **Masthead** — `GIT STATS.` wordmark with red accent period + meta info (repo count / date range / generated date)
+2. **Section 01 / Trend** — Line chart with metric + granularity dropdowns, **editable range bar** containing two `<input type="date">` (or `<input type="month">` when granularity is month) and preset buttons (30D / 90D / 6M / 1Y / ALL). The range bar drives and is driven by ECharts `dataZoom`; legend items are dynamically filtered to only show repositories with commits inside the selected range.
+3. **Section 02 / Aggregate** — Aggregate Calendar heatmap with year selector
+4. **Section 03 / Repositories** — CSS grid (forced 2 columns) of per-repo cards. Each card shows: repo name, repo path (monospace), **Local + Remote signal lamps** (small colored circles with letters L / R), Continue / Archived button with MDI icon. Calendar cell size is fixed so day cells stay square; JS dynamically resizes chart containers when year selection changes between single-year and multi-year ranges.
+5. **Detail Modal** — Opens when any repo card is clicked. Shows: large repo name, path, 7-cell meta grid (Commits / Lines / First / Last / Local / Remote / Action), a large single-repo line chart (default granularity `day`) with its own metric + granularity dropdowns, and a large single-repo heatmap. Closeable via the × button, backdrop click, or Escape key.
+
+`openFolder(path)` builds a `vscode://file/` URI and clicks a synthetic link — used by all Continue / Archived buttons. Continue / Archived buttons call `event.stopPropagation()` so clicking them does not open the modal.
 
 ### `visualizer.py`
 
-Single public function:
-
-- `generate_html(json_dir, output_path)` → `str` — orchestrates the full pipeline: load data → compute charts → render template → write file
+- `_repo_stats(repo)` → `dict` — private helper, computes summary stats (total_commits, total_changes, first_commit, last_commit) for the modal meta grid
+- `generate_html(json_dir, output_path)` → `str` — orchestrates the full pipeline: load data → compute charts (line / aggregate heatmap / individual heatmaps / single-repo line / single-repo heatmap) → compute repo stats → render template → write file
 
 ### Architecture: Pre-computation Strategy
 
-All metric×granularity combinations are pre-computed at HTML generation time and embedded as JavaScript global objects. Users switch between them dynamically in the browser via dropdown controls — no page reload needed.
+All metric×granularity×year combinations are pre-computed at HTML generation time and embedded as JavaScript global objects. Users switch between them dynamically in the browser via dropdown controls — no page reload needed. Per-repo line + heatmap options are also pre-computed for every repo so the detail modal opens instantly.
+
+Template context injected by `generate_html`:
+
+- `line_js_obj`, `heatmap_js_obj`, `active_repos_js_obj` — main chart data
+- `single_repo_line_js_obj`, `single_repo_heatmap_js_obj` — per-repo modal data
+- `individual_charts` — list of dicts with `id / index / name / path / sync_label / local_color / local_label / remote_color / remote_label / is_archived / last_commit / stats`
+- `sync_legend` — list of `{kind, color, label}` items (taken from `SYNC_LEGEND`)
+- `years`, `current_year`, `generated_date`, `repo_count`, `date_range` — page-level meta
 
 The generated HTML provides:
 
-1. **Line Chart** — metric dropdown (Lines Changed / Commit Count) + granularity dropdown (Day/Week/Month)
-2. **Aggregate Heatmap** — year selector dropdown (All Years / specific year)
-3. **Individual Heatmaps** — CSS grid of per-repo calendar charts with sync status emoji, year selector and "Continue" / "Archived" button (`vscode://file/` URI)
+1. **Line Chart** — metric dropdown + granularity dropdown + editable date range inputs + preset buttons + dynamic legend filtering
+2. **Aggregate Heatmap** — year selector dropdown, fixed-square calendar cells
+3. **Individual Heatmaps** — 2-column grid of per-repo cards with Local/Remote signal lamps + MDI Continue / Archived buttons; click any card to open the detail modal with per-repo line chart + large heatmap + meta info
 
 ## JSON Data Format
 
@@ -172,7 +195,20 @@ Each file in `data/` is named `{repo_name}.json`:
 }
 ```
 
-`sync_status` values: `synced` | `local_changes` | `remote_ahead` | `diverged` | `local_only_clean` | `local_only_dirty`
+`sync_status` values: `synced` | `local_changes` | `remote_ahead` | `diverged` | `local_only_clean` | `local_only_dirty` | `network_error_clean` | `network_error_dirty`
+
+At render time each value is decomposed into two independent signal lamps (see `SYNC_STATUS_INFO`):
+
+| sync_status | Local | Remote |
+|-------------|-------|--------|
+| `synced` | green Clean | green Synced |
+| `local_changes` | yellow Dirty | green Synced |
+| `remote_ahead` | green Clean | yellow Ahead |
+| `diverged` | yellow Dirty | yellow Ahead |
+| `local_only_clean` | green Clean | gray None |
+| `local_only_dirty` | yellow Dirty | gray None |
+| `network_error_clean` | green Clean | red Error |
+| `network_error_dirty` | yellow Dirty | red Error |
 
 `is_archived` values: `true` | `false` | `null` (not checked or check failed). Set by `sync --check` via GitHub API. Supports `GITHUB_TOKEN` env var for private repos.
 

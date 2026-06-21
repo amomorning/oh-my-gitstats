@@ -16,9 +16,12 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 - 🔍 **Batch Collection** — Scan multiple git repositories recursively
 - ⚡ **Incremental Sync** — Only fetch new commits since last collection
 - 🚀 **One-Step Workflow** — `gitstats auto` does everything in one command
-- 📈 **Line Charts** — Track changes over time with metric & granularity switching
-- 🗓️ **Calendar Heatmaps** — Visualize commit activity with year-based filtering
-- 🎯 **Aggregated & Individual Views** — See combined or per-repo statistics
+- 📈 **Line Charts** — Track changes over time with metric & granularity switching, editable date range inputs + presets (30D / 90D / 6M / 1Y / ALL), and dynamic legend filtering by selected range
+- 🗓️ **Calendar Heatmaps** — Visualize commit activity with year-based filtering; GitHub-style green gradient, perfectly square day cells
+- 🎯 **Aggregated & Individual Views** — See combined or per-repo statistics in a strict 2-column Swiss grid
+- 🔬 **Per-Repo Detail Modal** — Click any repo card to open a large line chart + heatmap + meta info (Commits / Lines / First / Last / Local / Remote / Action)
+- 🚦 **Local + Remote Signal Lamps** — Each sync status is decomposed into two independent traffic-light indicators (green / yellow / red / gray) for working-tree state and remote-tracking state
+- 🎨 **Swiss International Style** — Pure white background, Inter/Helvetica stack, 12-column grid, horizontal rules instead of shadows, MDI icons (BootCDN)
 - 📂 **VS Code Integration** — Open repo folders directly from the HTML report
 
 ## 🚀 Installation
@@ -186,13 +189,13 @@ Set permanently: **Settings** → **System** → **About** → **Advanced system
 
 ## 📁 Output
 
-The generated HTML contains:
+The generated HTML is built with a Swiss International Style design system (pure white, Inter/Helvetica, strict 12-column grid, MDI icons via BootCDN). It contains:
 
-1. **📈 Line Chart** — Changes over time with metric selector (Lines Changed / Commit Count) and granularity selector (Day/Week/Month). Click legend to toggle projects.
+1. **📈 Line Chart (01 / Trend)** — Metric selector (Lines Changed / Commit Count) + granularity selector (Day / Week / Month) + **editable date range bar** with two `<input type="date">` (or `<input type="month">` when granularity is month) and preset buttons (30D / 90D / 6M / 1Y / ALL). Range drives and is driven by ECharts `dataZoom`; legend items are dynamically filtered to only show repositories with commits inside the selected range.
 
-2. **🗓️ Aggregate Heatmap** — Combined activity across all repos with year selector (All Years / specific year).
+2. **🗓️ Aggregate Heatmap (02 / Aggregate)** — Combined activity across all repos with year selector (All Years / specific year). GitHub-style green gradient, fixed-square day cells, height auto-adjusts when switching between single-year and multi-year ranges.
 
-3. **📊 Individual Heatmaps** — Per-repository calendar views in a responsive grid, each with sync status indicator and a "Continue" / "Archived" button to open in VS Code.
+3. **📊 Individual Heatmaps (03 / Repositories)** — 2-column grid of per-repo cards. Each card shows repo name, monospace path, **Local + Remote signal lamps** (small colored circles labeled L / R, with traffic-light colors green / yellow / red / gray), and a Continue / Archived button with MDI icon (`vscode://file/` URI). Click any card to open the **Detail Modal** with a large per-repo line chart (default granularity Day), large heatmap, and a 7-cell meta grid (Commits / Lines / First / Last / Local / Remote / Action). Closeable via × button, backdrop click, or Escape key.
 
 ![Individual Heatmaps](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
@@ -219,20 +222,20 @@ Each repository generates a JSON file (`~/.gitstats/data/{repo_name}.json`):
 
 **`last_commit_hash`** — HEAD hash at collection time. During `sync`, repos with a matching hash are skipped instantly.
 
-**`sync_status`** — Sync state with remote:
+**`sync_status`** — Sync state, decomposed at render time into two independent Local + Remote signal lamps (the stored JSON value is a single enum):
 
-| Status | Description |
-| ------ | ----------- |
-| ✅ `synced` | In sync with remote |
-| ✏️ `local_changes` | Local has uncommitted changes, remote is up-to-date |
-| ⬇️ `remote_ahead` | Local is clean, but remote has new commits |
-| ⚠️ `diverged` | Local has uncommitted changes and remote has new commits |
-| 🔒 `local_only_clean` | No remote configured, local is clean |
-| 🔧 `local_only_dirty` | No remote configured, local has uncommitted changes |
-| ⚠️ `network_error_clean` | Remote exists but fetch failed, local is clean |
-| ⚠️ `network_error_dirty` | Remote exists but fetch failed, local has uncommitted changes |
+| sync_status | Local | Remote |
+| ----------- | ----- | ------ |
+| ✅ `synced` | 🟢 Clean | 🟢 Synced |
+| ✏️ `local_changes` | 🟡 Dirty | 🟢 Synced |
+| ⬇️ `remote_ahead` | 🟢 Clean | 🟡 Ahead |
+| ⚠️ `diverged` | 🟡 Dirty | 🟡 Ahead |
+| 🔒 `local_only_clean` | 🟢 Clean | ⚪ None |
+| 🔧 `local_only_dirty` | 🟡 Dirty | ⚪ None |
+| ⚠️ `network_error_clean` | 🟢 Clean | 🔴 Error |
+| ⚠️ `network_error_dirty` | 🟡 Dirty | 🔴 Error |
 
-**`is_archived`** — Whether the repo is archived on GitHub (set by `--check`). Values: `true`, `false`, or `null` (not checked). Archived repos show a grayed-out "Archived" button.
+**`is_archived`** — Whether the repo is archived on GitHub (set by `--check`). Values: `true`, `false`, or `null` (not checked or check failed). Archived repos show a grayed-out "Archived" button.
 
 ## 🔧 Requirements
 

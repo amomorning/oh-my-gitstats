@@ -16,9 +16,12 @@
 - 🔍 **批量收集** — 递归扫描目录下的所有 git 仓库
 - ⚡ **增量同步** — 仅获取上次采集之后的新 commit
 - 🚀 **一键运行** — `gitstats auto` 一步完成全部操作
-- 📈 **折线图** — 支持切换指标和时间粒度查看变化趋势
-- 🗓️ **日历热力图** — 按年份筛选查看提交活跃度
-- 🎯 **聚合 & 独立视图** — 查看所有仓库汇总或单仓库统计
+- 📈 **折线图** — 支持切换指标和时间粒度；**可编辑日期范围条**（两个日期输入 + 30D / 90D / 6M / 1Y / ALL 快捷按钮），图例按选中范围动态过滤
+- 🗓️ **日历热力图** — 按年份筛选查看提交活跃度；GitHub 风格绿色渐变，日历格子强制正方形
+- 🎯 **聚合 & 独立视图** — 严格的 2 列瑞士网格布局，查看所有仓库汇总或单仓库统计
+- 🔬 **项目详情 Modal** — 点击任意仓库卡片打开大号折线图 + 热力图 + 元信息（提交数 / 行数 / 首末次 / Local / Remote / 操作）
+- 🚦 **Local + Remote 双信号灯** — 每个 sync 状态在渲染时拆解为两个独立的红黄绿信号灯，分别表示工作树状态与远端跟踪状态
+- 🎨 **瑞士国际主义风格** — 纯白背景、Inter/Helvetica 字体、12 栏网格、水平分隔线代替阴影、MDI 图标（BootCDN 国内源）
 - 📂 **VS Code 集成** — 从 HTML 报告中直接打开仓库文件夹
 
 ## 🚀 安装
@@ -186,13 +189,13 @@ gitstats sync --check
 
 ## 📁 输出
 
-生成的 HTML 包含：
+生成的 HTML 采用瑞士国际主义风格设计系统（纯白、Inter/Helvetica、严格 12 栏网格、MDI 图标走 BootCDN 国内源），包含：
 
-1. **📈 折线图** — 支持指标切换（代码行变更 / 提交次数）和粒度切换（天 / 周 / 月），点击图例可显示/隐藏项目。
+1. **📈 折线图（01 / Trend）** — 指标选择（代码行变更 / 提交次数）+ 粒度选择（天 / 周 / 月）+ **可编辑日期范围条**：两个 `<input type="date">`（粒度为月时自动切换为 `<input type="month">`）外加快捷按钮（30D / 90D / 6M / 1Y / ALL）。范围条与 ECharts `dataZoom` 双向联动；图例按选中范围动态过滤，只显示有提交的项目。
 
-2. **🗓️ 聚合热力图** — 所有仓库的汇总活跃度，支持年份选择（全部年份 / 指定年份）。
+2. **🗓️ 聚合热力图（02 / Aggregate）** — 所有仓库的汇总活跃度，年份选择（全部年份 / 指定年份）。GitHub 风格绿色渐变，日历格子强制正方形，切换单年/多年时高度自动调整。
 
-3. **📊 独立热力图** — 每个仓库的日历视图，网格布局排列，显示同步状态指示器和"Continue" / "Archived"按钮（在 VS Code 中打开）。
+3. **📊 独立热力图（03 / Repositories）** — 2 列网格布局的仓库卡片。每张卡片显示：仓库名、等宽字体路径、**Local + Remote 双信号灯**（标记 L / R 的小圆点，红黄绿灰四色）、带 MDI 图标的 Continue / Archived 按钮（`vscode://file/` URI）。点击任意卡片打开**详情 Modal**：大号单仓库折线图（默认按天）、大号热力图、7 格元信息（提交数 / 行数 / 首次 / 末次 / Local / Remote / 操作）。支持 × 按钮、点击背景、ESC 键关闭。
 
 ![独立热力图](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
 
@@ -219,18 +222,18 @@ gitstats sync --check
 
 **`last_commit_hash`** — 采集时的 HEAD commit hash。执行 `sync` 时，hash 未变化的仓库会被直接跳过。
 
-**`sync_status`** — 仓库与远程的同步状态：
+**`sync_status`** — 同步状态，在渲染时拆解为两个独立的 Local + Remote 信号灯（JSON 存储的仍是单枚举值）：
 
-| 状态 | 说明 |
-| ---- | ---- |
-| ✅ `synced` | 与远程同步 |
-| ✏️ `local_changes` | 本地有未提交更改，远程无更新 |
-| ⬇️ `remote_ahead` | 本地干净，但远程有新提交 |
-| ⚠️ `diverged` | 本地有未提交更改且远程有新提交 |
-| 🔒 `local_only_clean` | 无远程仓库，本地干净 |
-| 🔧 `local_only_dirty` | 无远程仓库，本地有未提交更改 |
-| ⚠️ `network_error_clean` | 远程存在但 fetch 失败，本地干净 |
-| ⚠️ `network_error_dirty` | 远程存在但 fetch 失败，本地有未提交更改 |
+| sync_status | Local | Remote |
+| ----------- | ----- | ------ |
+| ✅ `synced` | 🟢 Clean | 🟢 Synced |
+| ✏️ `local_changes` | 🟡 Dirty | 🟢 Synced |
+| ⬇️ `remote_ahead` | 🟢 Clean | 🟡 Ahead |
+| ⚠️ `diverged` | 🟡 Dirty | 🟡 Ahead |
+| 🔒 `local_only_clean` | 🟢 Clean | ⚪ None |
+| 🔧 `local_only_dirty` | 🟡 Dirty | ⚪ None |
+| ⚠️ `network_error_clean` | 🟢 Clean | 🔴 Error |
+| ⚠️ `network_error_dirty` | 🟡 Dirty | 🔴 Error |
 
 **`is_archived`** — 仓库是否已在 GitHub 上归档（通过 `--check` 设置）。取值：`true`（已归档）、`false`（活跃）、`null`（未检查或检查失败）。已归档的仓库显示灰色的"Archived"按钮。
 
