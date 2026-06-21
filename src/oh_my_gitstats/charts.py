@@ -11,6 +11,13 @@ from pyecharts.commons.utils import JsCode
 from .constants import METRICS, GRANULARITIES, COLORS, HEATMAP_COLORS
 from .data import aggregate_by_period
 
+# Explicit English labels for calendar axes — array form bypasses
+# browser-locale auto-translation that the string nameMap ("en") suffers
+# from on some Chinese-locale systems.
+DAY_NAMES_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+MONTH_NAMES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
 
 def _axis_text_style() -> opts.TextStyleOpts:
     """Swiss-flavored axis/label text style."""
@@ -145,10 +152,13 @@ def build_agg_heatmap_opts(
         JSON string of chart options.
     """
     daily_data = defaultdict(int)
+    start_date, end_date = date_range
     for repo in all_data:
         for commit in repo["commits"]:
             ts = datetime.fromisoformat(commit["timestamp"])
             date_str = ts.strftime("%Y-%m-%d")
+            if date_str < start_date or date_str > end_date:
+                continue
             if metric == "commits":
                 daily_data[date_str] += 1
             else:
@@ -168,8 +178,8 @@ def build_agg_heatmap_opts(
             range_=date_range,
             cell_size="auto",
             yearlabel_opts=opts.CalendarYearLabelOpts(is_show=True),
-            monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
-            daylabel_opts=opts.CalendarDayLabelOpts(is_show=True),
+            monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True, name_map=MONTH_NAMES_EN),
+            daylabel_opts=opts.CalendarDayLabelOpts(is_show=True, name_map=DAY_NAMES_EN),
         ),
     )
 
@@ -221,12 +231,15 @@ def build_ind_heatmap_opts(
         List of JSON strings, one per repository.
     """
     options_list = []
+    start_date, end_date = date_range
 
     for repo in all_data:
         daily_data = defaultdict(int)
         for commit in repo["commits"]:
             ts = datetime.fromisoformat(commit["timestamp"])
             date_str = ts.strftime("%Y-%m-%d")
+            if date_str < start_date or date_str > end_date:
+                continue
             if metric == "commits":
                 daily_data[date_str] += 1
             else:
@@ -246,8 +259,8 @@ def build_ind_heatmap_opts(
                 range_=date_range,
                 cell_size=[cell_size, cell_size],
                 yearlabel_opts=opts.CalendarYearLabelOpts(is_show=False),
-                monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True),
-                daylabel_opts=opts.CalendarDayLabelOpts(is_show=False),
+                monthlabel_opts=opts.CalendarMonthLabelOpts(is_show=True, name_map=MONTH_NAMES_EN),
+                daylabel_opts=opts.CalendarDayLabelOpts(is_show=False, name_map=DAY_NAMES_EN),
             ),
         )
 

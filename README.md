@@ -21,7 +21,7 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 - 🎯 **Aggregated & Individual Views** — See combined or per-repo statistics in a strict 2-column Swiss grid
 - 🔬 **Per-Repo Detail Modal** — Click any repo card to open a large line chart + heatmap + meta info (Commits / Lines / First / Last / Local / Remote / Action)
 - 🚦 **Local + Remote Signal Lamps** — Each sync status is decomposed into two independent traffic-light indicators (green / yellow / red / gray) for working-tree state and remote-tracking state
-- 🎨 **Swiss International Style** — Pure white background, Inter/Helvetica stack, 12-column grid, horizontal rules instead of shadows, MDI icons (BootCDN)
+- 🎨 **Swiss International Style** — Pure white background, Inter/Helvetica stack, 12-column grid, horizontal rules instead of shadows, MDI icons (jsDelivr)
 - 📂 **VS Code Integration** — Open repo folders directly from the HTML report
 
 ## 🚀 Installation
@@ -189,7 +189,7 @@ Set permanently: **Settings** → **System** → **About** → **Advanced system
 
 ## 📁 Output
 
-The generated HTML is built with a Swiss International Style design system (pure white, Inter/Helvetica, strict 12-column grid, MDI icons via BootCDN). It contains:
+The generated HTML is built with a Swiss International Style design system (pure white, Inter/Helvetica, strict 12-column grid, MDI icons via jsDelivr). It contains:
 
 1. **📈 Line Chart (01 / Trend)** — Metric selector (Lines Changed / Commit Count) + granularity selector (Day / Week / Month) + **editable date range bar** with two `<input type="date">` (or `<input type="month">` when granularity is month) and preset buttons (30D / 90D / 6M / 1Y / ALL). Range drives and is driven by ECharts `dataZoom`; legend items are dynamically filtered to only show repositories with commits inside the selected range.
 

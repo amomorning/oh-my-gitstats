@@ -139,7 +139,7 @@ pyecharts chart building and JS object assembly. Cell size is forced to a square
 
 ### `template.html`
 
-Jinja2 HTML template loaded at runtime by `visualizer.py`. Rendered with **Swiss International Style** design: pure white background, Inter/Helvetica font stack, strict 12-column grid with generous margins, horizontal black rules instead of shadows, uppercase labels with letter-spacing, no rounded corners. Icons use MDI (Material Design Icons) loaded from BootCDN (China-friendly CDN).
+Jinja2 HTML template loaded at runtime by `visualizer.py`. Rendered with **Swiss International Style** design: pure white background, Inter/Helvetica font stack, strict 12-column grid with generous margins, horizontal black rules instead of shadows, uppercase labels with letter-spacing, no rounded corners. Icons use MDI (Material Design Icons) loaded from jsDelivr (`@mdi/font@7.4.47`).
 
 Sections and client-side JavaScript:
 
