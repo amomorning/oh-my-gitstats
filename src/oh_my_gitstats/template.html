@@ -1,134 +1,448 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Git Stats Visualization</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/mdi/7.4.47/css/materialdesignicons.min.css">
     <style>
+        :root {
+            --ink: #0a0a0a;
+            --paper: #ffffff;
+            --muted: #666666;
+            --rule: #0a0a0a;
+            --hairline: #d8d8d8;
+            --accent: #e60012;
+            --bg: #f4f4f4;
+            --font: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --mono: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            padding: 20px;
+        html, body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-size: 14px;
+            line-height: 1.45;
         }
-        h1 {
-            text-align: center;
-            margin-bottom: 24px;
-            color: #333;
+        body { padding: 0; }
+        .page {
+            max-width: 1440px;
+            margin: 0 auto;
+            background: var(--paper);
+            padding: 64px 80px 96px;
         }
-        .card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-bottom: 24px;
+
+        /* ===== Header ===== */
+        .masthead {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end;
+            gap: 32px;
+            padding-bottom: 32px;
+            border-bottom: 2px solid var(--ink);
         }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #eee;
+        .masthead-title {
+            font-size: 72px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 0.95;
+            text-transform: uppercase;
         }
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
+        .masthead-title .accent { color: var(--accent); }
+        .masthead-meta {
+            text-align: right;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+        .masthead-meta strong { color: var(--ink); font-weight: 600; }
+        .masthead-meta .meta-row { display: block; }
+        .masthead-meta .meta-row + .meta-row { margin-top: 2px; }
+
+        /* ===== Section ===== */
+        .section { padding: 48px 0; border-bottom: 1px solid var(--ink); }
+        .section:last-child { border-bottom: none; }
+        .section-head {
+            display: grid;
+            grid-template-columns: 200px 1fr auto;
+            align-items: end;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--accent);
+            padding-top: 6px;
+            border-top: 2px solid var(--accent);
+            display: inline-block;
+        }
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            line-height: 1.15;
         }
         .controls {
             display: flex;
-            gap: 8px;
-            align-items: center;
+            gap: 0;
+            align-items: stretch;
         }
+
+        /* ===== Form controls (Swiss) ===== */
         .selector {
-            padding: 6px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
+            font-family: var(--font);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--ink);
+            padding: 10px 32px 10px 14px;
             cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image:
+                linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+                linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+            background-position:
+                calc(100% - 14px) 50%,
+                calc(100% - 9px) 50%;
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
+            transition: background-color 0.12s, color 0.12s;
         }
-        .chart-container {
-            width: 100%;
+        .selector:hover { background-color: var(--ink); color: var(--paper); }
+        .selector + .selector { margin-left: -1px; }
+        .selector:focus { outline: 2px solid var(--accent); outline-offset: -2px; position: relative; z-index: 1; }
+
+        /* ===== Charts ===== */
+        .chart-container { width: 100%; }
+        .line-chart-container { height: 480px; border: 1px solid var(--hairline); }
+        .line-range-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--ink);
+            background: var(--paper);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
         }
+        .line-range-controls { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .line-range-label { color: var(--accent); }
+        .range-arrow { color: var(--muted); font-weight: 700; }
+        .range-date-input {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--ink);
+            padding: 6px 10px;
+            letter-spacing: 0;
+            text-transform: none;
+            cursor: pointer;
+            transition: background-color 0.12s, color 0.12s;
+        }
+        .range-date-input:hover { background: var(--ink); color: var(--paper); }
+        .range-date-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+        .range-presets { display: inline-flex; align-items: center; gap: 0; }
+        .range-preset-btn {
+            font-family: var(--font);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--ink);
+            background: var(--paper);
+            border: 1px solid var(--ink);
+            padding: 6px 10px;
+            cursor: pointer;
+            margin-left: -1px;
+            transition: background-color 0.12s, color 0.12s;
+        }
+        .range-preset-btn:hover { background: var(--ink); color: var(--paper); }
+        .range-preset-btn.active { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+        .line-legend-count { color: var(--muted); }
+        .line-legend-count strong { color: var(--ink); font-weight: 700; }
+        .agg-heatmap-container { height: 280px; }
+        .ind-heatmap { height: 110px; }
+
+        /* ===== Legend bar ===== */
+        .legend-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            padding: 16px 0 24px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 8px; }
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            display: inline-block;
+            border: 1px solid var(--ink);
+        }
+
+        /* ===== Individual grid ===== */
         .heatmaps-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0;
+            border-top: 1px solid var(--ink);
+            border-left: 1px solid var(--ink);
         }
         .heatmap-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 16px;
+            position: relative;
+            background: var(--paper);
+            padding: 20px 24px 16px;
+            border-right: 1px solid var(--ink);
+            border-bottom: 1px solid var(--ink);
+            cursor: pointer;
+            transition: background-color 0.12s;
         }
-        .heatmap-card .chart-container {
-            height: 180px;
-        }
+        .heatmap-card:hover { background-color: #fafafa; }
+        .heatmap-card:hover .repo-name { color: var(--accent); }
         .repo-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
+            align-items: flex-start;
+            margin-bottom: 6px;
+            padding-right: 8px;
         }
         .repo-name {
-            font-weight: 600;
-            color: #333;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.005em;
+            color: var(--ink);
+            transition: color 0.12s;
         }
-        .open-folder-btn {
-            background: #4a90d9;
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
+        .repo-tools {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 10px;
         }
-        .open-folder-btn:hover {
-            background: #357abd;
-        }
-        .open-folder-btn.archived {
-            background: #999;
-            cursor: pointer;
-        }
-        .open-folder-btn.archived:hover {
-            background: #777;
-        }
-        .status-badge {
-            font-size: 16px;
-            cursor: help;
+        .signal-pair {
             display: inline-flex;
             align-items: center;
+            gap: 10px;
+            cursor: help;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--ink);
         }
-        .sync-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            padding: 8px 0 16px;
-            font-size: 13px;
-            color: #666;
-        }
-        .sync-legend-item {
-            display: flex;
+        .signal-item {
+            display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
+        }
+        .signal-letter {
+            color: var(--muted);
+            font-size: 9px;
+        }
+        .signal-lamp {
+            width: 10px;
+            height: 10px;
+            display: inline-block;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.25);
+        }
+        .modal-meta .signal-lamp { width: 14px; height: 14px; }
+        .legend-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding-right: 8px;
+            margin-right: 8px;
+            border-right: 1px solid var(--hairline);
+        }
+        .legend-group:last-child { border-right: none; }
+        .legend-group-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.14em;
         }
         .repo-path {
+            font-family: var(--mono);
             font-size: 11px;
-            color: #888;
-            margin-bottom: 8px;
-            font-family: monospace;
+            color: var(--muted);
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        .open-folder-btn {
+            font-family: var(--font);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--paper);
+            background: var(--ink);
+            border: 1px solid var(--ink);
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: background-color 0.12s, color 0.12s;
+        }
+        .open-folder-btn .mdi { font-size: 12px; vertical-align: -1px; margin-right: 4px; }
+        .open-folder-btn:hover { background: var(--paper); color: var(--ink); }
+        .open-folder-btn.archived {
+            background: var(--paper);
+            color: var(--muted);
+            border-color: var(--muted);
+        }
+        .open-folder-btn.archived:hover { color: var(--ink); border-color: var(--ink); }
+
+        /* ===== Modal ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 10, 0.7);
+            z-index: 100;
+            overflow: auto;
+            padding: 40px;
+        }
+        .modal-overlay.active { display: block; }
+        .modal {
+            background: var(--paper);
+            max-width: 1280px;
+            margin: 0 auto;
+            border: 2px solid var(--ink);
+        }
+        .modal-head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: end;
+            gap: 24px;
+            padding: 32px 40px 20px;
+            border-bottom: 2px solid var(--ink);
+        }
+        .modal-title {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+        .modal-subtitle {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 8px;
+            word-break: break-all;
+        }
+        .modal-close {
+            background: var(--ink);
+            color: var(--paper);
+            border: 1px solid var(--ink);
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            transition: background-color 0.12s, color 0.12s;
+        }
+        .modal-close:hover { background: var(--accent); border-color: var(--accent); }
+
+        .modal-meta {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0;
+            border-bottom: 1px solid var(--ink);
+        }
+        .meta-cell {
+            padding: 16px 20px;
+            border-right: 1px solid var(--hairline);
+        }
+        .meta-cell:last-child { border-right: none; }
+        .meta-key {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        .meta-val {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.005em;
+        }
+        .meta-val .swatch-cell { display: inline-flex; align-items: center; gap: 8px; }
+        .meta-val .swatch { width: 14px; height: 14px; display: inline-block; }
+
+        .modal-body { padding: 32px 40px 40px; }
+        .modal-block { margin-bottom: 32px; }
+        .modal-block:last-child { margin-bottom: 0; }
+        .modal-block-head {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--ink);
+        }
+        .modal-block-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+        .modal-line { height: 360px; border: 1px solid var(--hairline); }
+        .modal-heatmap { height: 240px; }
+
+        @media (max-width: 900px) {
+            .page { padding: 32px 24px 48px; }
+            .masthead-title { font-size: 44px; }
+            .masthead { grid-template-columns: 1fr; }
+            .masthead-meta { text-align: left; }
+            .section-head { grid-template-columns: 1fr; }
+            .heatmaps-grid { grid-template-columns: 1fr; }
+            .modal-meta { grid-template-columns: repeat(2, 1fr); }
+            .meta-cell { border-bottom: 1px solid var(--hairline); }
         }
     </style>
 </head>
 <body>
-    <h1>📊 Git Stats Visualization</h1>
+<div class="page">
 
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">📈 Commit Activity Over Time</span>
+    <!-- ========== MASTHEAD ========== -->
+    <header class="masthead">
+        <div class="masthead-title">GIT<br>STATS<span class="accent">.</span></div>
+        <div class="masthead-meta">
+            <span class="meta-row"><strong>{{ repo_count }}</strong> REPOSITORIES</span>
+            <span class="meta-row">{{ date_range[0] }} &mdash; {{ date_range[1] }}</span>
+            <span class="meta-row">GENERATED {{ generated_date }}</span>
+        </div>
+    </header>
+
+    <!-- ========== SECTION 01 / LINE CHART ========== -->
+    <section class="section">
+        <div class="section-head">
+            <span class="section-label">01 / Trend</span>
+            <h2 class="section-title">Commit Activity Over Time</h2>
             <div class="controls">
                 <select class="selector" id="metric-selector" onchange="onMetricChange(this.value)">
                     <option value="changes">Lines Changed</option>
@@ -141,179 +455,694 @@
                 </select>
             </div>
         </div>
-        <div class="chart-container" id="line-chart" style="height:500px;"></div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">🗓️ Aggregated Commit Activity</span>
-            <select class="selector" id="aggregate-year-selector" onchange="updateAggregateHeatmap(this.value)">
-                <option value="all">All Years</option>
-                {% for year in years %}
-                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
-                {% endfor %}
-            </select>
+        <div class="line-range-bar">
+            <div class="line-range-controls">
+                <span class="line-range-label">Range</span>
+                <input type="date" id="range-start-date" class="range-date-input" />
+                <span class="range-arrow range-arrow-date">&rarr;</span>
+                <input type="date" id="range-end-date" class="range-date-input" />
+                <input type="month" id="range-start-month" class="range-date-input" style="display:none" />
+                <span class="range-arrow range-arrow-month" style="display:none">&rarr;</span>
+                <input type="month" id="range-end-month" class="range-date-input" style="display:none" />
+            </div>
+            <div class="range-presets">
+                <button type="button" class="range-preset-btn" data-preset="30d">30D</button>
+                <button type="button" class="range-preset-btn" data-preset="90d">90D</button>
+                <button type="button" class="range-preset-btn" data-preset="6m">6M</button>
+                <button type="button" class="range-preset-btn" data-preset="1y">1Y</button>
+                <button type="button" class="range-preset-btn" data-preset="all">ALL</button>
+            </div>
+            <span class="line-legend-count">
+                <strong id="line-active-count">0</strong> / <span id="line-total-count">0</span> active repositories in range
+            </span>
         </div>
-        <div class="chart-container" id="aggregate-heatmap" style="height:300px;"></div>
-    </div>
+        <div class="chart-container line-chart-container" id="line-chart"></div>
+    </section>
 
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">📁 Individual Repository Heatmaps</span>
-            <select class="selector" id="individual-year-selector" onchange="updateIndividualHeatmaps(this.value)">
-                <option value="all">All Years</option>
-                {% for year in years %}
-                <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
-                {% endfor %}
-            </select>
-            <select class="selector" id="sort-selector" onchange="sortHeatmaps(this.value)">
-                <option value="name-asc">Name A → Z</option>
-                <option value="name-desc">Name Z → A</option>
-                <option value="time-desc" selected>Last commit (newest)</option>
-                <option value="time-asc">Last commit (oldest)</option>
-            </select>
+    <!-- ========== SECTION 02 / AGGREGATE HEATMAP ========== -->
+    <section class="section">
+        <div class="section-head">
+            <span class="section-label">02 / Aggregate</span>
+            <h2 class="section-title">Aggregated Commit Activity</h2>
+            <div class="controls">
+                <select class="selector" id="aggregate-year-selector" onchange="updateAggregateHeatmap(this.value)">
+                    <option value="all">All Years</option>
+                    {% for year in years %}
+                    <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
-        <div class="sync-legend">
+        <div class="chart-container agg-heatmap-container" id="aggregate-heatmap"></div>
+    </section>
+
+    <!-- ========== SECTION 03 / INDIVIDUAL HEATMAPS ========== -->
+    <section class="section">
+        <div class="section-head">
+            <span class="section-label">03 / Repositories</span>
+            <h2 class="section-title">Individual Repository Heatmaps</h2>
+            <div class="controls">
+                <select class="selector" id="individual-year-selector" onchange="updateIndividualHeatmaps(this.value)">
+                    <option value="all">All Years</option>
+                    {% for year in years %}
+                    <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+                <select class="selector" id="sort-selector" onchange="sortHeatmaps(this.value)">
+                    <option value="name-asc">Name A &rarr; Z</option>
+                    <option value="name-desc">Name Z &rarr; A</option>
+                    <option value="time-desc" selected>Last commit (newest)</option>
+                    <option value="time-asc">Last commit (oldest)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="legend-bar">
+            {% set ns = namespace(current=None) %}
             {% for item in sync_legend %}
-            <span class="sync-legend-item">{{ item.emoji }} {{ item.label }}</span>
+            {% if item.kind != ns.current %}
+            {% if ns.current %}</span>{% endif %}
+            <span class="legend-group">
+                <span class="legend-group-label">{{ item.kind }}</span>
+            {% set ns.current = item.kind %}
+            {% endif %}
+            <span class="legend-item">
+                <span class="legend-swatch" style="background:{{ item.color }};"></span>
+                {{ item.label }}
+            </span>
             {% endfor %}
+            {% if ns.current %}</span>{% endif %}
         </div>
-        <div class="heatmaps-grid">
+
+        <div class="heatmaps-grid" id="heatmaps-grid">
             {% for item in individual_charts %}
-            <div class="heatmap-card" data-repo-index="{{ loop.index0 }}" data-name="{{ item.name }}" data-last-commit="{{ item.last_commit }}">
+            <div class="heatmap-card"
+                 data-repo-index="{{ item.index }}"
+                 data-name="{{ item.name }}"
+                 data-last-commit="{{ item.last_commit }}"
+                 onclick="openRepoModal({{ item.index }})">
                 <div class="repo-header">
                     <span class="repo-name">{{ item.name }}</span>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        {% if item.sync_emoji %}
-                        <span class="status-badge" title="{{ item.sync_label }}">{{ item.sync_emoji }}</span>
+                    <div class="repo-tools">
+                        {% if item.local_label or item.remote_label %}
+                        <span class="signal-pair" title="{{ item.sync_label }}">
+                            <span class="signal-item">
+                                <span class="signal-letter">L</span>
+                                <span class="signal-lamp" style="background:{{ item.local_color }};"></span>
+                                {{ item.local_label }}
+                            </span>
+                            <span class="signal-item">
+                                <span class="signal-letter">R</span>
+                                <span class="signal-lamp" style="background:{{ item.remote_color }};"></span>
+                                {{ item.remote_label }}
+                            </span>
+                        </span>
                         {% endif %}
                         {% if item.is_archived == true %}
-                        <button class="open-folder-btn archived" onclick="openFolder('{{ item.path }}')">
-                            &#128450; Archived
+                        <button class="open-folder-btn archived"
+                                onclick="event.stopPropagation(); openFolder('{{ item.path }}')">
+                            <span class="mdi mdi-archive"></span> Archived
                         </button>
                         {% else %}
-                        <button class="open-folder-btn" onclick="openFolder('{{ item.path }}')">
-                            &#128194; Continue
+                        <button class="open-folder-btn"
+                                onclick="event.stopPropagation(); openFolder('{{ item.path }}')">
+                            <span class="mdi mdi-folder-open"></span> Continue
                         </button>
                         {% endif %}
                     </div>
                 </div>
                 <div class="repo-path">{{ item.path }}</div>
-                <div class="chart-container" id="{{ item.id }}" style="height:160px;"></div>
+                <div class="chart-container ind-heatmap" id="{{ item.id }}"></div>
             </div>
             {% endfor %}
         </div>
+    </section>
+
+</div>
+
+<!-- ========== MODAL ========== -->
+<div class="modal-overlay" id="repo-modal" onclick="onOverlayClick(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="modal-repo-name">REPO</div>
+                <div class="modal-subtitle" id="modal-repo-path">/path</div>
+            </div>
+            <button class="modal-close" onclick="closeRepoModal()" aria-label="Close"><span class="mdi mdi-close"></span></button>
+        </div>
+        <div class="modal-meta" id="modal-meta-grid"></div>
+        <div class="modal-body">
+            <div class="modal-block">
+                <div class="modal-block-head">
+                    <span class="modal-block-title">Commit Activity</span>
+                    <div class="controls">
+                        <select class="selector" id="modal-metric-selector" onchange="onModalMetricChange(this.value)">
+                            <option value="changes">Lines Changed</option>
+                            <option value="commits" selected>Commit Count</option>
+                        </select>
+                        <select class="selector" id="modal-granularity-selector" onchange="onModalGranularityChange(this.value)">
+                            <option value="day" selected>Day</option>
+                            <option value="week">Week</option>
+                            <option value="month">Month</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-line chart-container" id="modal-line-chart"></div>
+            </div>
+            <div class="modal-block">
+                <div class="modal-block-head">
+                    <span class="modal-block-title">Heatmap &mdash; <span id="modal-year-label">All Years</span></span>
+                </div>
+                <div class="modal-heatmap chart-container" id="modal-heatmap"></div>
+            </div>
+        </div>
     </div>
+</div>
 
-    <script>
-        // Pre-computed chart data
-        var lineData = {{ line_js_obj }};
-        var heatmapData = {{ heatmap_js_obj }};
-        var activeRepos = {{ active_repos_js_obj }};
-
-        // Current state
-        var currentMetric = 'commits';
-        var currentGranularity = 'week';
-
-        // Open folder function
-        function openFolder(path) {
-            var vscodeUrl = 'vscode://file/' + path.replace(/\\\\/g, '/');
-            var link = document.createElement('a');
-            link.href = vscodeUrl;
-            link.click();
-        }
-
-        // Line chart
-        var lineChart = echarts.init(document.getElementById('line-chart'));
-        lineChart.setOption(lineData[currentMetric][currentGranularity]);
-        window.addEventListener('resize', function() { lineChart.resize(); });
-
-        // Aggregate heatmap
-        var currentYear = '{{ current_year }}';
-        var aggregateChart = echarts.init(document.getElementById('aggregate-heatmap'));
-        aggregateChart.setOption(heatmapData[currentMetric][currentYear].aggregate);
-        window.addEventListener('resize', function() { aggregateChart.resize(); });
-
-        // Individual heatmaps
-        var individualCharts = [];
+<script>
+    /* ============================================================
+       Pre-computed data injected from Python
+       ============================================================ */
+    var lineData = {{ line_js_obj }};
+    var heatmapData = {{ heatmap_js_obj }};
+    var activeRepos = {{ active_repos_js_obj }};
+    var singleRepoLineData = {{ single_repo_line_js_obj }};
+    var singleRepoHeatmapData = {{ single_repo_heatmap_js_obj }};
+    var years = [{% for y in years %}{{ y | tojson }}{% if not loop.last %},{% endif %}{% endfor %}];
+    var totalYears = years.length || 1;
+    var repoMeta = [
         {% for item in individual_charts %}
-        (function() {
-            var chart = echarts.init(document.getElementById('{{ item.id }}'));
-            individualCharts.push(chart);
-            window.addEventListener('resize', function() { chart.resize(); });
-        })();
+        {
+            index: {{ item.index }},
+            name: {{ item.name | tojson }},
+            path: {{ item.path | tojson }},
+            sync_label: {{ item.sync_label | tojson }},
+            local_color: {{ item.local_color | tojson }},
+            local_label: {{ item.local_label | tojson }},
+            remote_color: {{ item.remote_color | tojson }},
+            remote_label: {{ item.remote_label | tojson }},
+            is_archived: {{ item.is_archived | tojson }},
+            stats: {{ item.stats | tojson }}
+        }{% if not loop.last %},{% endif %}
         {% endfor %}
+    ];
 
-        // Initialize individual heatmaps
+    /* ============================================================
+       State
+       ============================================================ */
+    var currentMetric = 'commits';
+    var currentGranularity = 'week';
+    var currentYear = '{{ current_year }}';
+
+    var modalRepoIndex = null;
+    var modalMetric = 'commits';
+    var modalGranularity = 'day';
+    var modalYear = '{{ current_year }}';
+    var modalLineChart = null;
+    var modalHeatmapChart = null;
+
+    /* ============================================================
+       Utils
+       ============================================================ */
+    function openFolder(path) {
+        var vscodeUrl = 'vscode://file/' + path.replace(/\\\\/g, '/');
+        var link = document.createElement('a');
+        link.href = vscodeUrl;
+        link.click();
+    }
+
+    /* ============================================================
+       Main charts
+       ============================================================ */
+    var lineChart = echarts.init(document.getElementById('line-chart'));
+    lineChart.setOption(lineData[currentMetric][currentGranularity]);
+
+    /* Line chart: dynamic range + legend filtering by dataZoom selection. */
+    function getLineRangeIndices() {
+        var opt = lineChart.getOption();
+        var xData = opt.xAxis[0].data;
+        var total = xData.length;
+        var dzList = opt.dataZoom || [];
+        var startIdx = 0, endIdx = total - 1;
+        for (var i = 0; i < dzList.length; i++) {
+            var dz = dzList[i];
+            if (dz.startValue != null) {
+                startIdx = Math.max(startIdx, dz.startValue);
+                endIdx = Math.min(endIdx, dz.endValue);
+            } else if (dz.start != null && dz.end != null) {
+                startIdx = Math.max(startIdx, Math.floor(dz.start / 100 * total));
+                endIdx = Math.min(endIdx, Math.ceil(dz.end / 100 * total) - 1);
+            }
+        }
+        if (startIdx < 0) startIdx = 0;
+        if (endIdx >= total) endIdx = total - 1;
+        if (startIdx > endIdx) { var t = startIdx; startIdx = endIdx; endIdx = t; }
+        return { xData: xData, startIdx: startIdx, endIdx: endIdx, series: opt.series };
+    }
+
+    /* ----- Date <-> period string <-> input value helpers ----- */
+    function parsePeriod(period, granularity) {
+        var parts = String(period).split('-').map(Number);
+        if (granularity === 'month') {
+            return new Date(parts[0], (parts[1] || 1) - 1, 1);
+        }
+        return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    }
+
+    function dateToInputValue(date, granularity) {
+        var y = date.getFullYear();
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        if (granularity === 'month') return y + '-' + m;
+        var d = String(date.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + d;
+    }
+
+    function inputValueToDate(value, granularity) {
+        if (!value) return null;
+        var parts = value.split('-').map(Number);
+        if (granularity === 'month') {
+            return new Date(parts[0], (parts[1] || 1) - 1, 1);
+        }
+        return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    }
+
+    function clampDateToXAxis(date, xData, granularity) {
+        if (!xData.length) return date;
+        var first = parsePeriod(xData[0], granularity);
+        var last = parsePeriod(xData[xData.length - 1], granularity);
+        var t = date.getTime();
+        if (t < first.getTime()) return first;
+        if (t > last.getTime()) return last;
+        return date;
+    }
+
+    function dateToNearestIndex(date, xData, granularity) {
+        // Binary search the largest index whose period <= date.
+        var target = date.getTime();
+        var lo = 0, hi = xData.length - 1;
+        if (hi < 0) return 0;
+        if (parsePeriod(xData[0], granularity).getTime() >= target) return 0;
+        if (parsePeriod(xData[hi], granularity).getTime() <= target) return hi;
+        while (lo < hi) {
+            var mid = (lo + hi + 1) >> 1;
+            if (parsePeriod(xData[mid], granularity).getTime() <= target) lo = mid;
+            else hi = mid - 1;
+        }
+        return lo;
+    }
+
+    function applyDateRangeToChart(startDate, endDate) {
+        var opt = lineChart.getOption();
+        var xData = opt.xAxis[0].data;
+        if (!xData.length) return;
+        var s = clampDateToXAxis(startDate, xData, currentGranularity);
+        var e = clampDateToXAxis(endDate, xData, currentGranularity);
+        if (s.getTime() > e.getTime()) { var tmp = s; s = e; e = tmp; }
+        var startIdx = dateToNearestIndex(s, xData, currentGranularity);
+        var endIdx = dateToNearestIndex(e, xData, currentGranularity);
+        lineChart.dispatchAction({
+            type: 'dataZoom',
+            startValue: startIdx,
+            endValue: endIdx
+        });
+        // dispatchAction fires 'datazoom' which calls refreshLineRangeState.
+    }
+
+    function applyPreset(preset) {
+        var opt = lineChart.getOption();
+        var xData = opt.xAxis[0].data;
+        if (!xData.length) return;
+        if (preset === 'all') {
+            lineChart.dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
+            return;
+        }
+        var last = parsePeriod(xData[xData.length - 1], currentGranularity);
+        var start = new Date(last);
+        switch (preset) {
+            case '30d': start.setDate(start.getDate() - 30); break;
+            case '90d': start.setDate(start.getDate() - 90); break;
+            case '6m':  start.setMonth(start.getMonth() - 6); break;
+            case '1y':  start.setFullYear(start.getFullYear() - 1); break;
+            default: return;
+        }
+        applyDateRangeToChart(start, last);
+    }
+
+    function clearPresetActive() {
+        document.querySelectorAll('.range-preset-btn').forEach(function(b) {
+            b.classList.remove('active');
+        });
+    }
+
+    function markPresetActiveIfMatch() {
+        // Highlight ALL when full range selected; otherwise clear.
+        var r = getLineRangeIndices();
+        var isFull = r.startIdx === 0 && r.endIdx === r.xData.length - 1;
+        clearPresetActive();
+        if (isFull) {
+            var allBtn = document.querySelector('.range-preset-btn[data-preset="all"]');
+            if (allBtn) allBtn.classList.add('active');
+        }
+    }
+
+    function syncRangeControlVisibility() {
+        var isMonth = currentGranularity === 'month';
+        var sd = document.getElementById('range-start-date');
+        var ed = document.getElementById('range-end-date');
+        var sm = document.getElementById('range-start-month');
+        var em = document.getElementById('range-end-month');
+        var aD = document.querySelectorAll('.range-arrow-date');
+        var aM = document.querySelectorAll('.range-arrow-month');
+        if (sd) sd.style.display = isMonth ? 'none' : '';
+        if (ed) ed.style.display = isMonth ? 'none' : '';
+        if (sm) sm.style.display = isMonth ? '' : 'none';
+        if (em) em.style.display = isMonth ? '' : 'none';
+        aD.forEach(function(el){ el.style.display = isMonth ? 'none' : ''; });
+        aM.forEach(function(el){ el.style.display = isMonth ? '' : 'none'; });
+    }
+
+    function onRangeInputChange() {
+        var sVal, eVal;
+        if (currentGranularity === 'month') {
+            sVal = document.getElementById('range-start-month').value;
+            eVal = document.getElementById('range-end-month').value;
+        } else {
+            sVal = document.getElementById('range-start-date').value;
+            eVal = document.getElementById('range-end-date').value;
+        }
+        if (!sVal || !eVal) return;
+        var s = inputValueToDate(sVal, currentGranularity);
+        var e = inputValueToDate(eVal, currentGranularity);
+        if (!s || !e) return;
+        applyDateRangeToChart(s, e);
+    }
+
+    function updateLineRangeDisplay() {
+        var r = getLineRangeIndices();
+        var startDate = r.xData[r.startIdx] || '';
+        var endDate = r.xData[r.endIdx] || '';
+        if (currentGranularity === 'month') {
+            // period "YYYY-MM" already matches input[type=month] value format
+            var sm = document.getElementById('range-start-month');
+            var em = document.getElementById('range-end-month');
+            if (sm && startDate) sm.value = startDate;
+            if (em && endDate) em.value = endDate;
+        } else {
+            // period "YYYY-MM-DD" matches input[type=date] value format
+            var sd = document.getElementById('range-start-date');
+            var ed = document.getElementById('range-end-date');
+            if (sd && startDate) sd.value = startDate;
+            if (ed && endDate) ed.value = endDate;
+        }
+    }
+
+    function updateLineLegendByRange() {
+        var r = getLineRangeIndices();
+        var visibleNames = [];
+        r.series.forEach(function(s) {
+            var has = false;
+            for (var i = r.startIdx; i <= r.endIdx && i < s.data.length; i++) {
+                var v = s.data[i];
+                var y = (v == null) ? 0 : (Array.isArray(v) ? v[1] : v);
+                if (y && y > 0) { has = true; break; }
+            }
+            if (has) visibleNames.push(s.name);
+        });
+        document.getElementById('line-active-count').textContent = visibleNames.length;
+        document.getElementById('line-total-count').textContent = r.series.length;
+        lineChart.setOption({ legend: { data: visibleNames } });
+    }
+
+    function refreshLineRangeState() {
+        updateLineRangeDisplay();
+        updateLineLegendByRange();
+        markPresetActiveIfMatch();
+    }
+
+    lineChart.on('datazoom', refreshLineRangeState);
+    setTimeout(refreshLineRangeState, 0);
+
+    // Bind input + preset handlers (delegated, no inline handlers needed).
+    ['range-start-date', 'range-end-date', 'range-start-month', 'range-end-month'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', onRangeInputChange);
+    });
+    document.querySelectorAll('.range-preset-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            applyPreset(btn.getAttribute('data-preset'));
+        });
+    });
+    syncRangeControlVisibility();
+
+    var aggregateChart = echarts.init(document.getElementById('aggregate-heatmap'));
+    aggregateChart.setOption(heatmapData[currentMetric][currentYear].aggregate);
+
+    var individualCharts = [];
+    {% for item in individual_charts %}
+    (function() {
+        var chart = echarts.init(document.getElementById('{{ item.id }}'));
+        individualCharts.push(chart);
+    })();
+    {% endfor %}
+
+    for (var i = 0; i < individualCharts.length; i++) {
+        individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
+    }
+    filterRepos(currentMetric, currentYear);
+    sortHeatmaps(document.getElementById('sort-selector').value);
+    applyCalendarHeights(currentYear);
+
+    /* ============================================================
+       Sorting / Filtering
+       ============================================================ */
+    function sortHeatmaps(order) {
+        var grid = document.getElementById('heatmaps-grid');
+        var cards = Array.from(grid.querySelectorAll('.heatmap-card'));
+        cards.sort(function(a, b) {
+            switch (order) {
+                case 'name-asc':
+                    return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+                case 'name-desc':
+                    return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
+                case 'time-asc':
+                    return (a.getAttribute('data-last-commit') || '').localeCompare(b.getAttribute('data-last-commit') || '');
+                case 'time-desc':
+                    return (b.getAttribute('data-last-commit') || '').localeCompare(a.getAttribute('data-last-commit') || '');
+                default:
+                    return 0;
+            }
+        });
+        cards.forEach(function(card) { grid.appendChild(card); });
+    }
+
+    function filterRepos(metric, year) {
+        var active = activeRepos[metric][year];
+        var cards = document.querySelectorAll('.heatmap-card');
+        cards.forEach(function(card) {
+            var idx = parseInt(card.getAttribute('data-repo-index'));
+            card.style.display = active.indexOf(idx) !== -1 ? '' : 'none';
+        });
+    }
+
+    /* ============================================================
+       Main control handlers
+       ============================================================ */
+    function onMetricChange(metric) {
+        currentMetric = metric;
+        lineChart.setOption(lineData[currentMetric][currentGranularity], true);
+        setTimeout(refreshLineRangeState, 0);
+
+        var year = document.getElementById('aggregate-year-selector').value;
+        aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
         for (var i = 0; i < individualCharts.length; i++) {
-            individualCharts[i].setOption(heatmapData[currentMetric][currentYear].individual[i]);
+            individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
         }
-        filterRepos(currentMetric, currentYear);
-        sortHeatmaps(document.getElementById('sort-selector').value);
+        filterRepos(currentMetric, year);
 
-        function sortHeatmaps(order) {
-            var grid = document.querySelector('.heatmaps-grid');
-            var cards = Array.from(grid.querySelectorAll('.heatmap-card'));
-            cards.sort(function(a, b) {
-                switch (order) {
-                    case 'name-asc':
-                        return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
-                    case 'name-desc':
-                        return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
-                    case 'time-asc':
-                        return (a.getAttribute('data-last-commit') || '').localeCompare(b.getAttribute('data-last-commit') || '');
-                    case 'time-desc':
-                        return (b.getAttribute('data-last-commit') || '').localeCompare(a.getAttribute('data-last-commit') || '');
-                    default:
-                        return 0;
-                }
-            });
-            cards.forEach(function(card) { grid.appendChild(card); });
+        // Sync modal metric if open
+        if (modalRepoIndex !== null && modalMetric !== metric) {
+            modalMetric = metric;
+            document.getElementById('modal-metric-selector').value = modalMetric;
+            refreshModalLine();
+        }
+    }
+
+    function onGranularityChange(granularity) {
+        currentGranularity = granularity;
+        lineChart.setOption(lineData[currentMetric][currentGranularity], true);
+        syncRangeControlVisibility();
+        setTimeout(refreshLineRangeState, 0);
+    }
+
+    /* ============================================================
+       Dynamic calendar height: keep cells perfectly square and
+       avoid clipping when switching between single-year and
+       multi-year ranges.
+       ============================================================ */
+    function calendarHeight(year, total, cellSize, padding) {
+        var span = year === 'all' ? total : 1;
+        return padding + span * (cellSize * 7 + cellSize * 2);
+    }
+
+    function applyCalendarHeights(year) {
+        var agg = document.getElementById('aggregate-heatmap');
+        var aggH = calendarHeight(year, totalYears, 18, 60);
+        agg.style.height = aggH + 'px';
+        aggregateChart.resize();
+
+        var indH = calendarHeight(year, totalYears, 10, 30);
+        var cards = document.querySelectorAll('.heatmap-card .chart-container');
+        cards.forEach(function(c) { c.style.height = indH + 'px'; });
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].resize();
         }
 
-        function filterRepos(metric, year) {
-            var active = activeRepos[metric][year];
-            var cards = document.querySelectorAll('.heatmap-card');
-            cards.forEach(function(card) {
-                var idx = parseInt(card.getAttribute('data-repo-index'));
-                card.style.display = active.indexOf(idx) !== -1 ? '' : 'none';
-            });
+        if (modalRepoIndex !== null && modalHeatmapChart) {
+            var modalH = calendarHeight(modalYear, totalYears, 16, 40);
+            document.getElementById('modal-heatmap').style.height = modalH + 'px';
+            modalHeatmapChart.resize();
         }
+    }
 
-        // Control handlers
-        function onMetricChange(metric) {
-            currentMetric = metric;
-            lineChart.setOption(lineData[currentMetric][currentGranularity], true);
+    function updateAggregateHeatmap(year) {
+        currentYear = year;
+        aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
+        document.getElementById('individual-year-selector').value = year;
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+        }
+        filterRepos(currentMetric, year);
+        applyCalendarHeights(year);
+    }
 
-            var year = document.getElementById('aggregate-year-selector').value;
-            aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
-            for (var i = 0; i < individualCharts.length; i++) {
-                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+    function updateIndividualHeatmaps(year) {
+        currentYear = year;
+        document.getElementById('aggregate-year-selector').value = year;
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
+        }
+        filterRepos(currentMetric, year);
+        applyCalendarHeights(year);
+    }
+
+    /* ============================================================
+       Modal: per-repo detail view
+       ============================================================ */
+    function openRepoModal(idx) {
+        var meta = repoMeta[idx];
+        if (!meta) return;
+        modalRepoIndex = idx;
+
+        // Sync metric with current global state; granularity stays at modal default (day)
+        modalMetric = currentMetric;
+        modalGranularity = 'day';
+        modalYear = currentYear;
+        document.getElementById('modal-metric-selector').value = modalMetric;
+        document.getElementById('modal-granularity-selector').value = modalGranularity;
+
+        // Header
+        document.getElementById('modal-repo-name').textContent = meta.name.toUpperCase();
+        document.getElementById('modal-repo-path').textContent = meta.path;
+
+        // Meta grid
+        var stats = meta.stats || {};
+        function lampHTML(color, label) {
+            if (!label) return '-';
+            return '<span class="swatch-cell"><span class="signal-lamp" style="background:' + color + ';"></span>' + label + '</span>';
+        }
+        var metaCells = [
+            { key: 'Commits',    val: stats.total_commits != null ? stats.total_commits : '-' },
+            { key: 'Lines',      val: stats.total_changes != null ? stats.total_changes : '-' },
+            { key: 'First',      val: stats.first_commit || '-' },
+            { key: 'Last',       val: stats.last_commit || '-' },
+            { key: 'Local',      val: lampHTML(meta.local_color, meta.local_label), html: true },
+            { key: 'Remote',     val: lampHTML(meta.remote_color, meta.remote_label), html: true },
+            { key: 'Action',     val: meta.is_archived === true
+                ? '<button class="open-folder-btn archived" onclick="openFolder(\'' + escapePath(meta.path) + '\')"><span class=\"mdi mdi-archive\"></span> Archived</button>'
+                : '<button class="open-folder-btn" onclick="openFolder(\'' + escapePath(meta.path) + '\')"><span class=\"mdi mdi-folder-open\"></span> Continue</button>', html: true }
+        ];
+        var grid = document.getElementById('modal-meta-grid');
+        grid.innerHTML = metaCells.map(function(c) {
+            return '<div class="meta-cell"><div class="meta-key">' + c.key + '</div><div class="meta-val">' + (c.val == null ? '-' : c.val) + '</div></div>';
+        }).join('');
+
+        // Year label
+        document.getElementById('modal-year-label').textContent =
+            modalYear === 'all' ? 'All Years' : modalYear;
+
+        // Show overlay
+        document.getElementById('repo-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Init or refresh charts (defer to ensure DOM visible)
+        setTimeout(function() {
+            if (!modalLineChart) {
+                modalLineChart = echarts.init(document.getElementById('modal-line-chart'));
+                modalHeatmapChart = echarts.init(document.getElementById('modal-heatmap'));
             }
-            filterRepos(currentMetric, year);
-        }
+            var modalH = calendarHeight(modalYear, totalYears, 16, 40);
+            document.getElementById('modal-heatmap').style.height = modalH + 'px';
+            modalHeatmapChart.resize();
+            refreshModalLine();
+            refreshModalHeatmap();
+        }, 20);
+    }
 
-        function onGranularityChange(granularity) {
-            currentGranularity = granularity;
-            lineChart.setOption(lineData[currentMetric][currentGranularity], true);
-        }
+    function closeRepoModal() {
+        document.getElementById('repo-modal').classList.remove('active');
+        document.body.style.overflow = '';
+        modalRepoIndex = null;
+    }
 
-        function updateAggregateHeatmap(year) {
-            aggregateChart.setOption(heatmapData[currentMetric][year].aggregate, true);
-            document.getElementById('individual-year-selector').value = year;
-            for (var i = 0; i < individualCharts.length; i++) {
-                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
-            }
-            filterRepos(currentMetric, year);
-        }
+    function onOverlayClick(event) {
+        if (event.target.id === 'repo-modal') closeRepoModal();
+    }
 
-        function updateIndividualHeatmaps(year) {
-            document.getElementById('aggregate-year-selector').value = year;
-            for (var i = 0; i < individualCharts.length; i++) {
-                individualCharts[i].setOption(heatmapData[currentMetric][year].individual[i], true);
-            }
-            filterRepos(currentMetric, year);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modalRepoIndex !== null) closeRepoModal();
+    });
+
+    function refreshModalLine() {
+        if (modalRepoIndex === null || !modalLineChart) return;
+        var opts = singleRepoLineData[modalRepoIndex][modalMetric][modalGranularity];
+        modalLineChart.setOption(opts, true);
+    }
+
+    function refreshModalHeatmap() {
+        if (modalRepoIndex === null || !modalHeatmapChart) return;
+        var opts = singleRepoHeatmapData[modalRepoIndex][modalMetric][modalYear];
+        modalHeatmapChart.setOption(opts, true);
+        document.getElementById('modal-year-label').textContent =
+            modalYear === 'all' ? 'All Years' : modalYear;
+    }
+
+    function onModalMetricChange(metric) {
+        modalMetric = metric;
+        refreshModalLine();
+        refreshModalHeatmap();
+    }
+
+    function onModalGranularityChange(granularity) {
+        modalGranularity = granularity;
+        refreshModalLine();
+    }
+
+    function escapePath(p) {
+        return (p || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    /* ============================================================
+       Resize handling
+       ============================================================ */
+    window.addEventListener('resize', function() {
+        lineChart.resize();
+        aggregateChart.resize();
+        for (var i = 0; i < individualCharts.length; i++) {
+            individualCharts[i].resize();
         }
-    </script>
+        if (modalLineChart) modalLineChart.resize();
+        if (modalHeatmapChart) modalHeatmapChart.resize();
+    });
+</script>
 </body>
 </html>
