@@ -4,8 +4,11 @@ import os
 import sys
 import threading
 import time
+import warnings
 import webbrowser
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message=r".*urllib3.*or chardet.*doesn't match.*")
 
 import click
 

@@ -8,8 +8,10 @@ A Python CLI tool for collecting git commit statistics and visualizing them as i
 
 </div>
 
+
 ![Line Chart](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/linechart.png)
 ![Heatmap](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/heatmap.png)
+
 
 ## ✨ Features
 
@@ -198,6 +200,7 @@ The generated HTML is built with a Swiss International Style design system (pure
 3. **📊 Individual Heatmaps (03 / Repositories)** — 2-column grid of per-repo cards. Each card shows repo name, monospace path, **Local + Remote signal lamps** (small colored circles labeled L / R, with traffic-light colors green / yellow / red / gray), and a Continue / Archived button with MDI icon (`vscode://file/` URI). Click any card to open the **Detail Modal** with a large per-repo line chart (default granularity Day), large heatmap, and a 7-cell meta grid (Commits / Lines / First / Last / Local / Remote / Action). Closeable via × button, backdrop click, or Escape key.
 
 ![Individual Heatmaps](https://github.com/amomorning/oh-my-gitstats/raw/main/imgs/repo.png)
+
 
 ## 📋 JSON Format
 
