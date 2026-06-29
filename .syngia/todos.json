@@ -1,0 +1,14 @@
+[
+  {
+    "id": "06fa83a9-b542-46c6-9ddb-6d551fecad85",
+    "title": "verbose传参",
+    "description": "为gitstats auto命令添加--verbose传参，默认是一个旋转状态标记，只有--verbose下才会像现在一样输出很多内容。\n",
+    "status": "done",
+    "priority": "medium",
+    "tags": [],
+    "createdAt": 1781675130094,
+    "updatedAt": 1781681428562,
+    "startedAt": 1781654400000,
+    "doneDate": 1781681428562
+  }
+]
